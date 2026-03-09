@@ -28,14 +28,10 @@ The tool includes a **web UI dashboard with charts** and performs **ultra-fast P
 
 ## Features
 
-### Ultra Fast Plex Scanner
+### Plex Scanner
 
 The scanner uses the **native Plex XML API** instead of slow metadata requests.
 
-Performance example:
-
-- 1000 movies → ~2 seconds
-- 3000 movies → ~4 seconds
 
 ---
 
@@ -340,12 +336,9 @@ L'outil propose une **interface web avec graphiques** et un **scan Plex ultra ra
 
 ## Fonctionnalités
 
-### Scanner Plex ultra rapide
+### Scanner Plex 
 
 Utilise l'API XML native de Plex.
-
-- 1000 films → ~2 secondes
-- 3000 films → ~4 secondes
 
 ---
 
