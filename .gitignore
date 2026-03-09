@@ -1,0 +1,73 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual env
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# -------------------------
+# Environment / secrets
+# -------------------------
+.env
+.env.*
+*.env
+
+# -------------------------
+# Data generated at runtime
+# -------------------------
+data/*.json
+
+# keep folder but ignore content
+!data/.gitkeep
+
+# -------------------------
+# Config overrides
+# -------------------------
+config/config.yml
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+logs/
+
+# -------------------------
+# OS files
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# VSCode / IDE
+# -------------------------
+.vscode/
+.idea/
+
+# -------------------------
+# Docker
+# -------------------------
+*.pid
+*.sock
+
+# -------------------------
+# Node (if frontend tooling later)
+# -------------------------
+node_modules/
+
+# -------------------------
+# Misc
+# -------------------------
+coverage/
+.cache/
