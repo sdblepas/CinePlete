@@ -69,38 +69,15 @@ class TMDB:
 
         return data
 
-    def search_person(self, name):
-
-        url = (
-            "https://api.themoviedb.org/3/search/person"
-            f"?api_key={self.api_key}&query={requests.utils.quote(name)}"
-        )
-
-        data = self.get(url)
-
-        results = data.get("results", [])
-
-        if not results:
-            return None
-
-        return results[0]["id"]
-
-    def person_movies(self, person_id):
-
-        url = (
-            "https://api.themoviedb.org/3/person/"
-            f"{person_id}/movie_credits?api_key={self.api_key}"
-        )
-
-        data = self.get(url)
-
-        return data.get("cast", [])
+    # ------------------------------------------------
+    # MOVIES
+    # ------------------------------------------------
 
     def movie(self, tmdb_id):
 
         url = (
-            "https://api.themoviedb.org/3/movie/"
-            f"{tmdb_id}?api_key={self.api_key}"
+            f"https://api.themoviedb.org/3/movie/{tmdb_id}"
+            f"?api_key={self.api_key}"
         )
 
         return self.get(url)
@@ -108,21 +85,55 @@ class TMDB:
     def collection(self, collection_id):
 
         url = (
-            "https://api.themoviedb.org/3/collection/"
-            f"{collection_id}?api_key={self.api_key}"
+            f"https://api.themoviedb.org/3/collection/{collection_id}"
+            f"?api_key={self.api_key}"
         )
 
         return self.get(url)
 
-    def discover(self, page=1):
+    def top_rated(self, page=1):
 
         url = (
-            "https://api.themoviedb.org/3/discover/movie"
-            f"?api_key={self.api_key}&sort_by=vote_average.desc"
-            f"&vote_count.gte=5000&page={page}"
+            "https://api.themoviedb.org/3/movie/top_rated"
+            f"?api_key={self.api_key}&page={page}"
         )
 
         return self.get(url)
+
+    # ------------------------------------------------
+    # PEOPLE
+    # ------------------------------------------------
+
+    def search_person(self, name):
+
+        url = (
+            "https://api.themoviedb.org/3/search/person"
+            f"?api_key={self.api_key}&query={requests.utils.quote(name)}"
+        )
+
+        return self.get(url)
+
+    def person_credits(self, person_id):
+
+        url = (
+            f"https://api.themoviedb.org/3/person/{person_id}/movie_credits"
+            f"?api_key={self.api_key}"
+        )
+
+        return self.get(url)
+
+    # ------------------------------------------------
+    # IMAGES
+    # ------------------------------------------------
+
+    def poster_url(self, path):
+
+        if not path:
+            return None
+
+        return f"https://image.tmdb.org/t/p/w500{path}"
+
+    # ------------------------------------------------
 
     def flush(self):
 
