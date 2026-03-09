@@ -5,8 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5e375443-e645-4cdd-b44c-3f1a5b94d616" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/scanner.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/scanner.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/tmdb.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/tmdb.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/web.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/web.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/static/app.js" beforeDir="false" afterPath="$PROJECT_DIR$/static/app.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -116,7 +118,7 @@
       <workItem from="1772699198818" duration="8069000" />
       <workItem from="1772777616820" duration="972000" />
       <workItem from="1773040747162" duration="4159000" />
-      <workItem from="1773044928486" duration="4220000" />
+      <workItem from="1773044928486" duration="6136000" />
     </task>
     <servers />
   </component>
@@ -128,7 +130,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/app/web.py</url>
-          <line>43</line>
+          <line>54</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>
