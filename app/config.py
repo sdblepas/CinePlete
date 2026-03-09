@@ -2,7 +2,7 @@ import os
 import copy
 import yaml
 
-CONFIG_DIR = "/app/config"
+CONFIG_DIR = "/config"
 CONFIG_FILE = f"{CONFIG_DIR}/config.yml"
 
 
