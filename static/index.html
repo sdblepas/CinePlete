@@ -10,11 +10,10 @@
 
 <body class="bg-zinc-950 text-zinc-100">
   <div class="flex min-h-screen">
-
     <aside class="w-64 bg-zinc-900 border-r border-zinc-800 p-4">
       <div class="text-xl font-semibold mb-6">Plex Audit</div>
 
-      <nav class="space-y-2">
+      <nav class="space-y-2" id="sidebarNav">
         <button class="nav w-full text-left px-3 py-2 rounded bg-zinc-800" data-tab="dashboard">Dashboard</button>
 
         <div class="pt-2 text-xs uppercase tracking-wide text-zinc-500">Metadata health</div>
@@ -28,6 +27,9 @@
         <button class="nav w-full text-left px-3 py-2 rounded hover:bg-zinc-800" data-tab="classics">Classics</button>
         <button class="nav w-full text-left px-3 py-2 rounded hover:bg-zinc-800" data-tab="suggestions">Suggestions TMDB</button>
         <button class="nav w-full text-left px-3 py-2 rounded hover:bg-zinc-800" data-tab="wishlist">Wishlist</button>
+
+        <div class="pt-2 text-xs uppercase tracking-wide text-zinc-500">Settings</div>
+        <button class="nav w-full text-left px-3 py-2 rounded hover:bg-zinc-800" data-tab="config">Config</button>
       </nav>
 
       <div class="mt-6 space-y-2">
@@ -35,12 +37,11 @@
           Rescan
         </button>
         <div class="text-xs text-zinc-400" id="status"></div>
-        <div class="text-xs text-zinc-500">Radarr import: enable via .env</div>
       </div>
     </aside>
 
     <main class="flex-1 p-6">
-      <div class="flex flex-wrap gap-3 items-center mb-6">
+      <div id="topFilters" class="flex flex-wrap gap-3 items-center mb-6">
         <input id="search" class="bg-zinc-900 border border-zinc-800 rounded px-3 py-2 w-80"
                placeholder="Search title / group..." />
 
@@ -64,7 +65,6 @@
 
       <div id="content"></div>
     </main>
-
   </div>
 
   <script src="/static/app.js"></script>
