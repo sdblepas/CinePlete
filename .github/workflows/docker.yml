@@ -162,7 +162,7 @@ jobs:
           fi
 
   # ─────────────────────────────────────────────
-  # 3. BUILD & PUSH
+  # 4. BUILD & PUSH
   # ─────────────────────────────────────────────
   build:
     name: Build & Push Docker
@@ -188,6 +188,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           build-args: VERSION=${{ needs.version.outputs.version }}
           tags: |
             sdblepas/cineplete:latest
@@ -202,6 +203,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           build-args: VERSION=${{ needs.version.outputs.version }}
           tags: |
             sdblepas/cineplete:STG
