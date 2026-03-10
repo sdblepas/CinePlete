@@ -30,7 +30,7 @@ scan_state = {
     "running": False,
     "step": "",
     "step_index": 0,
-    "step_total": 7,
+    "step_total": 8,
     "detail": "",
     "error": None,
     "last_completed": None,
@@ -43,6 +43,7 @@ STEPS = [
     "Analyzing collections",
     "Analyzing directors",
     "Analyzing actors",
+    "Building suggestions",
     "Building results",
 ]
 
@@ -77,6 +78,7 @@ def build():
 
     classics_cfg    = cfg.get("CLASSICS", {})
     actor_hits_cfg  = cfg.get("ACTOR_HITS", {})
+    suggestions_cfg = cfg.get("SUGGESTIONS", {})
     tmdb_cfg        = cfg.get("TMDB", {})
 
     classics_pages              = int(classics_cfg.get("CLASSICS_PAGES", 4))
@@ -85,6 +87,8 @@ def build():
     classics_max_results        = int(classics_cfg.get("CLASSICS_MAX_RESULTS", 120))
     actor_min_votes             = int(actor_hits_cfg.get("ACTOR_MIN_VOTES", 500))
     actor_max_results_per_actor = int(actor_hits_cfg.get("ACTOR_MAX_RESULTS_PER_ACTOR", 10))
+    suggestions_max_results     = int(suggestions_cfg.get("SUGGESTIONS_MAX_RESULTS", 100))
+    suggestions_min_score       = int(suggestions_cfg.get("SUGGESTIONS_MIN_SCORE", 2))
     tmdb_api_key                = tmdb_cfg.get("TMDB_API_KEY")
 
     if not tmdb_api_key:
@@ -98,6 +102,7 @@ def build():
     ignore_directors  = set(overrides.get("ignore_directors", []))
     ignore_actors     = set(overrides.get("ignore_actors", []))
     wishlist_movies   = set(overrides.get("wishlist_movies", []))
+    rec_fetched_ids   = set(overrides.get("rec_fetched_ids", []))
 
     # ---- PLEX SCAN --------------------------------------------
     _set_step(1)
@@ -244,7 +249,6 @@ def build():
 
     # ---- CLASSICS ---------------------------------------------
     classics = []
-    suggestions = []
 
     for page in range(1, classics_pages + 1):
         payload = tmdb.top_rated(page)
@@ -259,7 +263,7 @@ def build():
             if rating < classics_min_rating: continue
             if mid in plex_ids or mid in ignore_movies: continue
 
-            item = {
+            classics.append({
                 "title":      m.get("title"),
                 "tmdb":       mid,
                 "year":       (m.get("release_date") or "")[:4] or None,
@@ -268,17 +272,85 @@ def build():
                 "votes":      votes,
                 "rating":     rating,
                 "wishlist":   mid in wishlist_movies,
-            }
-            classics.append(item)
-            suggestions.append(item)
+            })
             if len(classics) >= classics_max_results:
                 break
 
         if len(classics) >= classics_max_results:
             break
 
-    log.info(f"Classic suggestions found: {len(classics)}")
+    log.info(f"Classics found: {len(classics)}")
     classics = sorted(classics, key=lambda x: (-x["rating"], -x["votes"]))
+
+    # ---- SUGGESTIONS (based on your library) ------------------
+    _set_step(6, f"{len(plex_ids)} library films")
+
+    # Score map: {tmdb_id: recommendation_count}
+    rec_scores: dict = {}
+
+    # Only fetch recs for IDs not yet in rec_fetched_ids
+    ids_to_fetch = [mid for mid in plex_ids if mid not in rec_fetched_ids]
+    newly_fetched = []
+
+    log.info(f"Fetching recommendations for {len(ids_to_fetch)} new films "
+             f"({len(rec_fetched_ids)} already cached)")
+
+    for mid in ids_to_fetch:
+        data = tmdb.recommendations(mid)
+        for r in data.get("results", []):
+            rid = int(r.get("id", 0))
+            if rid:
+                rec_scores[rid] = rec_scores.get(rid, 0) + 1
+        newly_fetched.append(mid)
+
+    # Also score from previously fetched IDs using cached responses
+    for mid in rec_fetched_ids:
+        data = tmdb.recommendations(mid)   # will hit cache, no HTTP call
+        for r in data.get("results", []):
+            rid = int(r.get("id", 0))
+            if rid:
+                rec_scores[rid] = rec_scores.get(rid, 0) + 1
+
+    # Persist newly fetched IDs
+    if newly_fetched:
+        overrides["rec_fetched_ids"] = list(rec_fetched_ids | set(newly_fetched))
+        save_json(OVERRIDES_FILE, overrides)
+        log.info(f"rec_fetched_ids updated: {len(overrides['rec_fetched_ids'])} total")
+
+    # Build suggestions list — exclude library, ignored, unreleased, below min score
+    suggestions = []
+    today = date.today().isoformat()
+
+    for rid, score in sorted(rec_scores.items(), key=lambda x: -x[1]):
+        if rid in plex_ids or rid in ignore_movies:
+            continue
+        if score < suggestions_min_score:
+            continue
+
+        md = get_movie(rid)
+        if not md:
+            continue
+
+        release = (md.get("release_date") or "")[:10]
+        if not release or release > today:
+            continue
+
+        suggestions.append({
+            "title":      md.get("title"),
+            "tmdb":       rid,
+            "year":       (md.get("release_date") or "")[:4] or None,
+            "poster":     tmdb.poster_url(md.get("poster_path")),
+            "popularity": md.get("popularity", 0),
+            "votes":      md.get("vote_count", 0),
+            "rating":     md.get("vote_average", 0),
+            "wishlist":   rid in wishlist_movies,
+            "rec_score":  score,   # how many of your films recommended this
+        })
+
+        if len(suggestions) >= suggestions_max_results:
+            break
+
+    log.info(f"Suggestions built: {len(suggestions)}")
 
     # ---- ACTORS -----------------------------------------------
     _set_step(5, f"{len(actors_map)} actors")
@@ -371,7 +443,7 @@ def build():
         })
 
     # ---- SCORES -----------------------------------------------
-    _set_step(6)
+    _set_step(7)
     actor_counts = Counter({k: len(v) for k, v in actors_map.items()})
     top_actors   = [{"name": n, "count": c} for n, c in actor_counts.most_common(40)]
 
@@ -408,7 +480,7 @@ def build():
         "directors":      directors,
         "actors":         actors,
         "classics":       classics,
-        "suggestions":    suggestions[:200],
+        "suggestions":    suggestions,
         "wishlist":       wishlist,
     }
 

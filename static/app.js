@@ -216,7 +216,7 @@ function tag(text, cls=""){
    MOVIE CARD  (poster-first design)
 ============================================================ */
 
-function movieCard(m){
+function movieCard(m, extraTag = ""){
   const poster = m.poster
     ? `<img class="movie-poster" src="${m.poster}" loading="lazy" alt=""/>`
     : `<div class="movie-poster-placeholder">NO<br>IMG</div>`
@@ -242,6 +242,7 @@ function movieCard(m){
           ${tag(`⭐ ${rating}`,"tag-gold")}
           ${m.votes ? tag(`${(m.votes/1000).toFixed(0)}k votes`) : ""}
           ${pop ? tag(`↑${pop}`) : ""}
+          ${extraTag}
         </div>
         <div class="movie-actions">${wBtn}${radarrBtn}</div>
       </div>
@@ -711,8 +712,11 @@ function renderSuggestions(){
   const list = applyFilters(DATA.suggestions||[])
   if (!list.length){ c.innerHTML=emptyStateHTML("No suggestions available"); return }
   c.innerHTML = `
-    <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">${list.length} suggestions from TMDB Top Rated</p>
-    <div class="grid-2">${list.map(movieCard).join("")}</div>`
+    <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">${list.length} films recommended by your library</p>
+    <div class="grid-2">${list.map(m => movieCard(m, m.rec_score
+      ? `<span class="tag tag-gold" style="font-size:.6rem">⚡ ${m.rec_score} match${m.rec_score>1?"es":""}</span>`
+      : ""
+    )).join("")}</div>`
 }
 
 /* ============================================================

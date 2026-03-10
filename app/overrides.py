@@ -8,6 +8,7 @@ DEFAULT = {
     "ignore_directors": [],
     "ignore_actors": [],
     "wishlist_movies": [],
+    "rec_fetched_ids": [],   # TMDB IDs whose recommendations have already been fetched
 }
 
 

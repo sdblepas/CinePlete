@@ -111,6 +111,13 @@ class TMDB:
         )
         return self.get(url)
 
+    def recommendations(self, tmdb_id: int) -> dict:
+        url = (
+            f"https://api.themoviedb.org/3/movie/{tmdb_id}/recommendations"
+            f"?api_key={self.api_key}"
+        )
+        return self.get(url)
+
     # ------------------------------------------------
     # PEOPLE
     # ------------------------------------------------
