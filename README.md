@@ -31,7 +31,7 @@ Ever wondered **which movies you're missing** from your favorite franchises, dir
 
 All in a **beautiful dashboard with charts and Radarr integration.**
 
-![Cineplete Demo](assets/demo.gif)
+![Cineplete Demo](assets/Demo.gif)
 ## Overview
 
 **Plex Movie Audit** is a local analysis tool that scans your Plex movie library and identifies:
