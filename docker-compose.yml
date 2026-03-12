@@ -1,23 +1,20 @@
 version: "3.9"
-
 services:
-
   cineplete:
     image: sdblepas/cineplete:latest
     container_name: cineplete
-
     ports:
       - "8787:8787"
-
     volumes:
       - /volume1/Docker/cineplete/config:/config
       - /volume1/Docker/cineplete/data:/data
-
+    labels:
+      net.unraid.docker.webui: "http://[IP]:[PORT:8787]"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/sdblepas/CinePlete/main/assets/icon.png"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8787')"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 20s
-
     restart: unless-stopped
