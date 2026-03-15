@@ -1,5 +1,5 @@
 fastapi==0.115.12
-uvicorn==0.34.0
+uvicorn==0.41.0
 requests==2.32.3
 pyyaml==6.0.2
 apscheduler==3.10.4
