@@ -200,7 +200,7 @@ jobs:
       # ── Non-main → STG + branch-sha ──
       - name: Build & Push (STG)
         if: needs.version.outputs.is_main == 'false'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
