@@ -2,6 +2,7 @@ import requests
 import time
 import json
 import os
+import threading
 
 from app.logger import get_logger
 
@@ -47,6 +48,7 @@ class TMDB:
         self.cache   = load_cache()
         self._calls_since_flush = 0
         self._error_count = 0
+        self._lock = threading.Lock()  # protects cache dict for concurrent workers
 
     # --------------------------------------------------
     # Build a cache key that does NOT include the API key
@@ -105,27 +107,28 @@ class TMDB:
     def get(self, url: str) -> dict:
         cache_key = self._cache_key(url)
 
-        # Cache hit — return immediately, no sleep
-        if cache_key in self.cache:
-            return self.cache[cache_key]
+        # Cache hit — check under lock, return immediately
+        with self._lock:
+            if cache_key in self.cache:
+                return self.cache[cache_key]
 
-        # Real HTTP call — apply rate-limit delay
+        # Real HTTP call — outside lock so other threads aren't blocked
         time.sleep(self.delay)
         data = self._request(url)
 
-        # Only cache successful (non-empty) responses
-        # so transient errors don't permanently poison the cache
-        if data:
-            self.cache[cache_key] = data
-            self._calls_since_flush += 1
+        # Write back under lock
+        with self._lock:
+            # Double-check: another thread may have fetched same key while we waited
+            if cache_key in self.cache:
+                return self.cache[cache_key]
 
-            if self._calls_since_flush >= FLUSH_EVERY:
-                save_cache(self.cache)
-                self._calls_since_flush = 0
-        else:
-            # Store empty result only for 404s (permanent) not for errors (transient)
-            # We detect 404 by absence of error_count increment in _request
-            pass
+            if data:
+                self.cache[cache_key] = data
+                self._calls_since_flush += 1
+
+                if self._calls_since_flush >= FLUSH_EVERY:
+                    save_cache(self.cache)
+                    self._calls_since_flush = 0
 
         return data
 

@@ -281,6 +281,54 @@ def api_cache_info():
     except FileNotFoundError:
         return {"exists": False, "age_seconds": None, "size_mb": 0}
 
+@app.post("/api/cache/backup")
+def api_cache_backup():
+    """Copy tmdb_cache.json → tmdb_cache.backup.json"""
+    import shutil
+    cache_file  = f"{DATA_DIR}/tmdb_cache.json"
+    backup_file = f"{DATA_DIR}/tmdb_cache.backup.json"
+    try:
+        if not os.path.exists(cache_file):
+            return {"ok": False, "error": "No cache file to back up"}
+        shutil.copy2(cache_file, backup_file)
+        stat = os.stat(backup_file)
+        size_mb = round(stat.st_size / 1024 / 1024, 1)
+        log.info(f"TMDB cache backed up ({size_mb} MB)")
+        return {"ok": True, "size_mb": size_mb}
+    except Exception as e:
+        log.error(f"Cache backup failed: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/cache/restore")
+def api_cache_restore():
+    """Copy tmdb_cache.backup.json → tmdb_cache.json"""
+    import shutil
+    cache_file  = f"{DATA_DIR}/tmdb_cache.json"
+    backup_file = f"{DATA_DIR}/tmdb_cache.backup.json"
+    try:
+        if not os.path.exists(backup_file):
+            return {"ok": False, "error": "No backup file found"}
+        shutil.copy2(backup_file, cache_file)
+        stat = os.stat(cache_file)
+        size_mb = round(stat.st_size / 1024 / 1024, 1)
+        log.info(f"TMDB cache restored from backup ({size_mb} MB)")
+        return {"ok": True, "size_mb": size_mb}
+    except Exception as e:
+        log.error(f"Cache restore failed: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/cache/backup/info")
+def api_cache_backup_info():
+    """Return backup file age and size if it exists."""
+    backup_file = f"{DATA_DIR}/tmdb_cache.backup.json"
+    try:
+        stat    = os.stat(backup_file)
+        age_s   = int(datetime.utcnow().timestamp() - stat.st_mtime)
+        size_mb = round(stat.st_size / 1024 / 1024, 1)
+        return {"exists": True, "age_seconds": age_s, "size_mb": size_mb}
+    except FileNotFoundError:
+        return {"exists": False}
+
 @app.post("/api/cache/clear")
 def api_cache_clear():
     """Delete the TMDB cache file."""

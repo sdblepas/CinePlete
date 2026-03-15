@@ -784,22 +784,55 @@ function renderNoMatch(){
    CONFIG
 ============================================================ */
 
+function _ageStr(s){
+  if (s < 3600)       return `${Math.floor(s/60)}m ago`
+  if (s < 86400)      return `${Math.floor(s/3600)}h ago`
+  return `${Math.floor(s/86400)}d ago`
+}
+
 async function loadCacheInfo(){
   try {
-    const info = await api("/api/cache/info")
+    const [info, bkp] = await Promise.all([
+      api("/api/cache/info"),
+      api("/api/cache/backup/info"),
+    ])
     const el = document.getElementById("cache-info")
     if (!el) return
+
+    let html = ""
     if (!info.exists){
-      el.textContent = "No cache yet — will be created on first scan."
-      return
+      html += `<div>No cache yet — will be created on first scan.</div>`
+    } else {
+      html += `<div>Cache: <span style="color:var(--text)">${info.size_mb} MB</span> · updated <span style="color:var(--text)">${_ageStr(info.age_seconds)}</span></div>`
     }
-    const age = info.age_seconds
-    let ageStr
-    if (age < 3600)       ageStr = `${Math.floor(age/60)}m ago`
-    else if (age < 86400) ageStr = `${Math.floor(age/3600)}h ago`
-    else                  ageStr = `${Math.floor(age/86400)}d ago`
-    el.textContent = `Last updated ${ageStr} · ${info.size_mb} MB`
+    if (bkp.exists){
+      html += `<div style="margin-top:.3rem">Backup: <span style="color:var(--text)">${bkp.size_mb} MB</span> · saved <span style="color:var(--text)">${_ageStr(bkp.age_seconds)}</span></div>`
+    } else {
+      html += `<div style="margin-top:.3rem;color:var(--text3)">No backup yet</div>`
+    }
+    el.innerHTML = html
   } catch(e) {}
+}
+
+async function backupCache(){
+  const res = await api("/api/cache/backup","POST",{})
+  if (res.ok){
+    toast(`Cache backed up (${res.size_mb} MB)`,"success")
+    loadCacheInfo()
+  } else {
+    toast("Backup failed: " + res.error,"error")
+  }
+}
+
+async function restoreCache(){
+  if (!confirm("Restore cache from backup? Current cache will be overwritten.")) return
+  const res = await api("/api/cache/restore","POST",{})
+  if (res.ok){
+    toast(`Cache restored (${res.size_mb} MB)`,"success")
+    loadCacheInfo()
+  } else {
+    toast("Restore failed: " + res.error,"error")
+  }
 }
 
 async function clearCache(){
@@ -857,6 +890,9 @@ function renderConfig(){
         <p style="font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:1rem 0 .75rem">Actors</p>
         ${field("cfg_actor_votes", "Min votes per film",    act.ACTOR_MIN_VOTES            ??500, "number")}
         ${field("cfg_actor_max",   "Max results per actor", act.ACTOR_MAX_RESULTS_PER_ACTOR??10,  "number")}
+        <p style="font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:1rem 0 .75rem">TMDB</p>
+        ${field("cfg_tmdb_workers","Concurrent workers (1–10)", tmdb.TMDB_WORKERS??6,"number")}
+        <p style="font-size:.68rem;color:var(--text3);margin-top:-.25rem;margin-bottom:.5rem">Higher = faster first scan. Default 6, max 10.</p>
         <p style="font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:1rem 0 .75rem">Plex Scanner</p>
         ${field("cfg_plex_page_size","Page size",               plex.PLEX_PAGE_SIZE   ??500, "number")}
         ${field("cfg_short_limit",  "Short movie limit (min)", plex.SHORT_MOVIE_LIMIT??60,  "number")}
@@ -890,7 +926,11 @@ function renderConfig(){
     <div class="form-section" id="cache-section">
       <div class="form-section-title">TMDB Cache</div>
       <div id="cache-info" style="font-size:.75rem;color:var(--text3);margin-bottom:.75rem">Loading…</div>
-      <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px" onclick="clearCache()">🗑 Clear Cache</button>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;border-color:rgba(34,197,94,.3);color:var(--green)" onclick="backupCache()">💾 Backup</button>
+        <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;border-color:rgba(59,130,246,.3);color:var(--blue)" onclick="restoreCache()">↩ Restore</button>
+        <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px" onclick="clearCache()">🗑 Clear</button>
+      </div>
     </div>
 
     <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
@@ -911,7 +951,7 @@ async function saveConfig(){
       PLEX_PAGE_SIZE:   vi("cfg_plex_page_size"),
       SHORT_MOVIE_LIMIT:vi("cfg_short_limit"),
     },
-    TMDB:{ TMDB_API_KEY: v("cfg_tmdb_key") },
+    TMDB:{ TMDB_API_KEY: v("cfg_tmdb_key"), TMDB_WORKERS: vi("cfg_tmdb_workers") },
     CLASSICS:{
       CLASSICS_PAGES:      vi("cfg_classics_pages"),
       CLASSICS_MIN_VOTES:  vi("cfg_classics_votes"),
