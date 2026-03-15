@@ -21,7 +21,6 @@ DEFAULT_CONFIG = {
     "TMDB": {
         "TMDB_API_KEY": "",
         "TMDB_MIN_DELAY": 0.02,
-        "TMDB_WORKERS": 6,       # concurrent workers for TMDB calls (1-10)
     },
     "CLASSICS": {
         "CLASSICS_PAGES": 4,
@@ -39,6 +38,12 @@ DEFAULT_CONFIG = {
     },
     "AUTOMATION": {
         "LIBRARY_POLL_INTERVAL": 30,   # minutes between library size checks (0 = disabled)
+    },
+    "TELEGRAM": {
+        "TELEGRAM_ENABLED": False,
+        "TELEGRAM_BOT_TOKEN": "",
+        "TELEGRAM_CHAT_ID": "",
+        "TELEGRAM_MIN_INTERVAL": 30,   # minimum minutes between notifications (0 = always)
     },
     "RADARR": {
         "RADARR_ENABLED": False,

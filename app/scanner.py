@@ -1,7 +1,6 @@
 import os
 import json
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date
 from collections import Counter
 
@@ -10,6 +9,7 @@ from app.plex_xml import scan_movies
 from app.tmdb import TMDB
 from app.overrides import load_json, save_json, remove_value
 from app.logger import get_logger
+from app import telegram
 
 DATA_DIR = "/data"
 RESULTS_FILE = f"{DATA_DIR}/results.json"
@@ -87,7 +87,6 @@ def build():
     actor_max_results_per_actor = int(actor_hits_cfg.get("ACTOR_MAX_RESULTS_PER_ACTOR", 10))
     suggestions_max_results     = int(suggestions_cfg.get("SUGGESTIONS_MAX_RESULTS", 100))
     suggestions_min_score       = int(suggestions_cfg.get("SUGGESTIONS_MIN_SCORE", 2))
-    tmdb_workers                = max(1, min(10, int(tmdb_cfg.get("TMDB_WORKERS", 6))))
     tmdb_api_key                = tmdb_cfg.get("TMDB_API_KEY")
 
     if not tmdb_api_key:
@@ -125,19 +124,13 @@ def build():
             movie_cache[mid] = tmdb.movie(mid)
         return movie_cache[mid]
 
-    # ---- TMDB VALIDATION (parallel) --------------------------
+    # ---- TMDB VALIDATION --------------------------------------
     _set_step(2, f"{len(plex_ids)} movies")
     tmdb_not_found = []
-
-    def _fetch_movie(mid):
-        return mid, tmdb.movie(mid)
-
-    with ThreadPoolExecutor(max_workers=tmdb_workers) as pool:
-        for mid, md in pool.map(_fetch_movie, list(plex_ids.keys())):
-            if md:
-                movie_cache[mid] = md
-            else:
-                tmdb_not_found.append({"tmdb": mid, "title": plex_ids[mid]})
+    for mid in plex_ids:
+        md = get_movie(mid)
+        if not md:
+            tmdb_not_found.append({"tmdb": mid, "title": plex_ids[mid]})
 
     # ---- COLLECTIONS ------------------------------------------
     _set_step(3)
@@ -209,29 +202,19 @@ def build():
     directors = []
     director_missing_total = 0
 
-    def _fetch_director(director):
-        if director in ignore_directors:
-            return director, None
-        sr = tmdb.search_person(director)
-        if not sr or not sr.get("results"):
-            return director, None
-        pid = sr["results"][0].get("id")
-        if not pid:
-            return director, None
-        credits = tmdb.person_credits(pid)
-        return director, credits
-
-    director_credits = {}
-    with ThreadPoolExecutor(max_workers=tmdb_workers) as pool:
-        for director, credits in pool.map(_fetch_director, list(directors_map.keys())):
-            if credits:
-                director_credits[director] = credits
-
     for director in directors_map.keys():
         if director in ignore_directors:
             continue
 
-        credits = director_credits.get(director)
+        sr = tmdb.search_person(director)
+        if not sr or not sr.get("results"):
+            continue
+
+        pid = sr["results"][0].get("id")
+        if not pid:
+            continue
+
+        credits = tmdb.person_credits(pid)
         if not credits:
             continue
 
@@ -319,25 +302,21 @@ def build():
     log.info(f"Fetching recommendations for {len(ids_to_fetch)} new films "
              f"({len(rec_fetched_ids)} already cached)")
 
-    def _fetch_recs(mid):
-        return mid, tmdb.recommendations(mid)
+    for mid in ids_to_fetch:
+        data = tmdb.recommendations(mid)
+        for r in data.get("results", []):
+            rid = int(r.get("id", 0))
+            if rid:
+                rec_scores[rid] = rec_scores.get(rid, 0) + 1
+        newly_fetched.append(mid)
 
-    # Fetch new IDs in parallel
-    with ThreadPoolExecutor(max_workers=tmdb_workers) as pool:
-        for mid, data in pool.map(_fetch_recs, ids_to_fetch):
-            for r in data.get("results", []):
-                rid = int(r.get("id", 0))
-                if rid:
-                    rec_scores[rid] = rec_scores.get(rid, 0) + 1
-            newly_fetched.append(mid)
-
-    # Score cached IDs (all cache hits — fast even sequential, but parallel anyway)
-    with ThreadPoolExecutor(max_workers=tmdb_workers) as pool:
-        for mid, data in pool.map(_fetch_recs, list(rec_fetched_ids)):
-            for r in data.get("results", []):
-                rid = int(r.get("id", 0))
-                if rid:
-                    rec_scores[rid] = rec_scores.get(rid, 0) + 1
+    # Also score from previously fetched IDs using cached responses
+    for mid in rec_fetched_ids:
+        data = tmdb.recommendations(mid)   # will hit cache, no HTTP call
+        for r in data.get("results", []):
+            rid = int(r.get("id", 0))
+            if rid:
+                rec_scores[rid] = rec_scores.get(rid, 0) + 1
 
     # Persist newly fetched IDs
     if newly_fetched:
@@ -385,27 +364,17 @@ def build():
     actors = []
     actor_missing_total = 0
 
-    def _fetch_actor(actor):
-        if actor in ignore_actors:
-            return actor, None
-        sr = tmdb.search_person(actor)
-        if not sr or not sr.get("results"):
-            return actor, None
-        pid = sr["results"][0]["id"]
-        credits = tmdb.person_credits(pid)
-        return actor, credits
-
-    actor_credits = {}
-    with ThreadPoolExecutor(max_workers=tmdb_workers) as pool:
-        for actor, credits in pool.map(_fetch_actor, list(actors_map.keys())):
-            if credits:
-                actor_credits[actor] = credits
-
     for actor in actors_map.keys():
         if actor in ignore_actors:
             continue
 
-        credits = actor_credits.get(actor)
+        sr = tmdb.search_person(actor)
+        if not sr or not sr.get("results"):
+            continue
+
+        pid = sr["results"][0]["id"]
+
+        credits = tmdb.person_credits(pid)
         if not credits:
             continue
 
@@ -528,6 +497,14 @@ def build():
     return results
 
 
+def _notify(results: dict, duration_s: int | None = None):
+    """Fire Telegram notification safely — never raises."""
+    try:
+        telegram.send_scan_summary(results, duration_s)
+    except Exception as e:
+        log.warning(f"Telegram notification error: {e}")
+
+
 def build_async():
     """
     Launch build() in a background thread.
@@ -542,9 +519,11 @@ def build_async():
         scan_state["error"]   = None
         _start = datetime.utcnow()
         try:
-            build()
+            results = build()
+            duration = round((datetime.utcnow() - _start).total_seconds())
             scan_state["last_completed"] = datetime.utcnow().isoformat() + "Z"
-            scan_state["last_duration"]  = round((datetime.utcnow() - _start).total_seconds())
+            scan_state["last_duration"]  = duration
+            _notify(results, duration)
         except Exception as e:
             log.exception("Scan failed")
             scan_state["error"] = str(e)
