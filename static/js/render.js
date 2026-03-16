@@ -476,7 +476,13 @@ async function renderLogs(){
     })
     box.scrollTop = box.scrollHeight
   } catch(e) {
-    document.getElementById("log-box").innerHTML =
-      `<span style="color:var(--red)">Failed to fetch logs: ${e.message}</span>`
+    const box = document.getElementById("log-box")
+    if (box){
+      box.innerHTML = ""
+      const span = document.createElement("span")
+      span.style.color = "var(--red)"
+      span.textContent = "Failed to fetch logs: " + e.message
+      box.appendChild(span)
+    }
   }
 }

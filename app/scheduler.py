@@ -12,7 +12,7 @@ import json
 import os
 
 import requests
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.config import load_config
