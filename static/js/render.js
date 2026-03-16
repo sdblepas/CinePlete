@@ -292,7 +292,7 @@ function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg 
 
   groups.forEach(g => {
     const name = g[nameKey]||""
-    if (groupFilter && name !== groupFilter) return
+    if (groupFilter && !name.toLowerCase().includes(groupFilter.toLowerCase())) return
 
     const sorted = [...(g.missing||[])].sort((a,b)=>{
       if(sort==="title")  return (a.title||"").localeCompare(b.title||"")
@@ -389,7 +389,9 @@ function renderClassics(){
 
 function renderSuggestions(){
   const c    = document.getElementById("content")
-  const list = applyFilters(DATA.suggestions||[])
+  // Sort by rec_score desc first, then apply user filters on top
+  const sorted = [...(DATA.suggestions||[])].sort((a,b) => (b.rec_score||0)-(a.rec_score||0))
+  const list = applyFilters(sorted)
   if (!list.length){ c.innerHTML=emptyStateHTML("No suggestions available"); return }
   c.innerHTML = `
     <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">${list.length} films recommended by your library</p>
@@ -461,14 +463,19 @@ async function renderLogs(){
     const res  = await fetch("/api/logs?lines=200")
     const data = await res.json()
     const box  = document.getElementById("log-box")
-    box.innerHTML = data.lines.map(line => {
+    // Build log lines safely using textContent to prevent XSS
+    box.innerHTML = ""
+    data.lines.forEach(line => {
       let color = "var(--text2)"
       if (line.includes("[ERROR   ]"))    color = "var(--red)"
       else if (line.includes("[WARNING ]")) color = "var(--amber)"
       else if (line.includes("[DEBUG   ]")) color = "var(--text3)"
       else if (line.includes("[INFO    ]")) color = "var(--text)"
-      return `<div style="color:${color};white-space:pre-wrap;word-break:break-all">${escHtml(line)}</div>`
-    }).join("")
+      const div = document.createElement("div")
+      div.style.cssText = `color:${color};white-space:pre-wrap;word-break:break-all`
+      div.textContent = line   // textContent never parses HTML — safe against XSS
+      box.appendChild(div)
+    })
     box.scrollTop = box.scrollHeight
   } catch(e) {
     document.getElementById("log-box").innerHTML =

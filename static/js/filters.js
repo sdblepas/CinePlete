@@ -18,7 +18,15 @@ function tag(text, cls=""){
   return `<span class="tag ${cls}">${text}</span>`
 }
 
-function getGroupFilter(){ return document.getElementById("groupFilter")?.value || "" }
+function getGroupFilter(){
+  const val = document.getElementById("groupFilter")?.value || ""
+  // Only filter if value exactly matches a group name (datalist selection)
+  // This allows partial typing without hiding everything
+  if (!val) return ""
+  const groups = getGroupsForTab(ACTIVE_TAB)
+  const exact = groups.find(g => (g.name||"").toLowerCase() === val.toLowerCase())
+  return exact ? exact.name : val
+}
 function getSort(){ return document.getElementById("sort")?.value || "popularity" }
 
 function applyFilters(list){
@@ -62,16 +70,26 @@ function updateFilterBar(){
   if (GROUP_TABS.has(ACTIVE_TAB)){
     const prevGroup = document.getElementById("groupFilter")?.value || ""
     const prevSort  = document.getElementById("sort")?.value || "popularity"
-    const groups = getGroupsForTab(ACTIVE_TAB).filter(g=>(g.missing||[]).length>0)
-    const opts   = groups.map(g=>{
-      const n = g.name||""; return `<option value="${n}"${n===prevGroup?" selected":""}>${n}</option>`
-    }).join("")
+    // Sort A→Z, only groups with missing films
+    const groups = getGroupsForTab(ACTIVE_TAB)
+      .filter(g=>(g.missing||[]).length>0)
+      .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+    const datalistId = `dl-${ACTIVE_TAB}`
+    const opts = groups.map(g=>`<option value="${g.name||""}"></option>`).join("")
 
     bar.innerHTML = `
-      <select id="groupFilter" style="min-width:200px">
-        <option value="">All ${ACTIVE_TAB}</option>${opts}
-      </select>
+      <div style="position:relative">
+        <input id="groupFilter" list="${datalistId}" placeholder="Filter ${ACTIVE_TAB}…"
+          value="${prevGroup}"
+          style="min-width:220px;background:var(--bg3);border:1px solid var(--border2);
+                 border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;
+                 font-size:.78rem;padding:.4rem .75rem;outline:none"/>
+        <datalist id="${datalistId}">${opts}</datalist>
+      </div>
       ${sortSelect(prevSort)}`
+
+    // Clear button support — if input cleared, re-render
+    document.getElementById("groupFilter")?.addEventListener("input", () => render())
   } else {
     const prevSearch = document.getElementById("search")?.value || ""
     const prevYear   = document.getElementById("yearFilter")?.value || ""

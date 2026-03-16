@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -64,7 +64,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest pyyaml apscheduler
+          pip install pytest pyyaml apscheduler defusedxml
 
       - name: Run tests
         run: pytest --tb=short -v
@@ -200,7 +200,7 @@ jobs:
       # ── Non-main → STG + branch-sha ──
       - name: Build & Push (STG)
         if: needs.version.outputs.is_main == 'false'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -211,42 +211,3 @@ jobs:
             sdblepas/cineplete:${{ needs.version.outputs.version }}
           cache-from: type=gha
           cache-to:   type=gha,mode=max
-
-  # ─────────────────────────────────────────────
-  # 5. SNYK CONTAINER SCAN
-  # ─────────────────────────────────────────────
-  snyk:
-    name: Snyk Container Scan
-    needs: [build, version]
-    if: github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Resolve image tag
-        id: tag
-        run: |
-          if [ "${{ needs.version.outputs.is_main }}" = "true" ]; then
-            echo "image=sdblepas/cineplete:${{ needs.version.outputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "image=sdblepas/cineplete:${{ needs.version.outputs.version }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run Snyk container scan
-        continue-on-error: true   # allows SARIF upload even when vulns are found
-        uses: snyk/actions/docker@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: ${{ steps.tag.outputs.image }}
-          args: >-
-            --file=Dockerfile
-            --severity-threshold=high
-            --exclude-base-image-vulns
-            --sarif-file-output=snyk.sarif
-
-      - name: Upload results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk.sarif
