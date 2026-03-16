@@ -81,7 +81,7 @@ jobs:
       is_main:  ${{ steps.ctx.outputs.is_main }}
     steps:
       - name: Checkout (full history for tags)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
