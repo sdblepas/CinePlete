@@ -292,7 +292,7 @@ function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg 
 
   groups.forEach(g => {
     const name = g[nameKey]||""
-    if (groupFilter && !name.toLowerCase().includes(groupFilter.toLowerCase())) return
+    if (groupFilter && name !== groupFilter) return
 
     const sorted = [...(g.missing||[])].sort((a,b)=>{
       if(sort==="title")  return (a.title||"").localeCompare(b.title||"")
@@ -389,9 +389,7 @@ function renderClassics(){
 
 function renderSuggestions(){
   const c    = document.getElementById("content")
-  // Sort by rec_score desc first, then apply user filters on top
-  const sorted = [...(DATA.suggestions||[])].sort((a,b) => (b.rec_score||0)-(a.rec_score||0))
-  const list = applyFilters(sorted)
+  const list = applyFilters(DATA.suggestions||[])
   if (!list.length){ c.innerHTML=emptyStateHTML("No suggestions available"); return }
   c.innerHTML = `
     <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">${list.length} films recommended by your library</p>

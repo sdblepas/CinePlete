@@ -19,13 +19,67 @@ function tag(text, cls=""){
 }
 
 function getGroupFilter(){
-  const val = document.getElementById("groupFilter")?.value || ""
-  // Only filter if value exactly matches a group name (datalist selection)
-  // This allows partial typing without hiding everything
-  if (!val) return ""
-  const groups = getGroupsForTab(ACTIVE_TAB)
-  const exact = groups.find(g => (g.name||"").toLowerCase() === val.toLowerCase())
-  return exact ? exact.name : val
+  return document.getElementById("groupFilterSearch")?.dataset.selected || ""
+}
+
+function clearGroupFilter(){
+  const inp = document.getElementById("groupFilterSearch")
+  if (inp){ inp.value = ""; inp.dataset.selected = "" }
+  const clr = document.getElementById("groupFilterClear")
+  if (clr) clr.style.display = "none"
+  render()
+}
+
+function _initGroupFilter(groups){
+  const inp  = document.getElementById("groupFilterSearch")
+  const drop = document.getElementById("groupFilterDropdown")
+  const clr  = document.getElementById("groupFilterClear")
+  if (!inp || !drop) return
+
+  // Restore previous selection display
+  const sel = inp.dataset.selected || ""
+  if (sel) inp.value = sel
+
+  function showDropdown(filter){
+    const f = (filter||"").toLowerCase()
+    const matched = groups.filter(g => !f || (g.name||"").toLowerCase().includes(f))
+    if (!matched.length){ drop.style.display = "none"; return }
+    drop.innerHTML = matched.map(g => {
+      const n = g.name||""
+      const active = n === inp.dataset.selected
+      return `<div class="gf-opt" data-name="${n.replace(/"/g,"&quot;")}"
+        style="padding:.5rem .85rem;font-size:.78rem;cursor:pointer;
+               color:${active?"var(--gold)":"var(--text2)"};
+               background:${active?"var(--gold-glow)":"transparent"}"
+        onmouseover="this.style.background='var(--bg3)'"
+        onmouseout="this.style.background='${active?"var(--gold-glow)":"transparent"}'"
+        >${n}</div>`
+    }).join("")
+    drop.style.display = "block"
+
+    drop.querySelectorAll(".gf-opt").forEach(el => {
+      el.addEventListener("mousedown", e => {
+        e.preventDefault()
+        const name = el.dataset.name
+        inp.value = name
+        inp.dataset.selected = name
+        drop.style.display = "none"
+        if (clr) clr.style.display = ""
+        render()
+      })
+    })
+  }
+
+  inp.addEventListener("input", () => {
+    inp.dataset.selected = ""
+    if (clr) clr.style.display = inp.value ? "" : "none"
+    showDropdown(inp.value)
+  })
+  inp.addEventListener("focus", () => showDropdown(inp.value))
+  inp.addEventListener("blur",  () => setTimeout(() => { drop.style.display = "none" }, 150))
+
+  // Show dropdown on first render if already has a value
+  if (inp.value) showDropdown(inp.value)
 }
 function getSort(){ return document.getElementById("sort")?.value || "popularity" }
 
@@ -41,10 +95,11 @@ function applyFilters(list){
   })
 
   out.sort((a,b) => {
-    if (sort==="title")  return (a.title||"").localeCompare(b.title||"")
-    if (sort==="year")   return parseInt(b.year||0)-parseInt(a.year||0)
-    if (sort==="rating") return (b.rating||0)-(a.rating||0)
-    if (sort==="votes")  return (b.votes||0)-(a.votes||0)
+    if (sort==="title")   return (a.title||"").localeCompare(b.title||"")
+    if (sort==="year")    return parseInt(b.year||0)-parseInt(a.year||0)
+    if (sort==="rating")  return (b.rating||0)-(a.rating||0)
+    if (sort==="votes")   return (b.votes||0)-(a.votes||0)
+    if (sort==="matches") return (b.rec_score||0)-(a.rec_score||0)
     return (b.popularity||0)-(a.popularity||0)
   })
   return out
@@ -68,28 +123,31 @@ function updateFilterBar(){
   bar.style.display="flex"
 
   if (GROUP_TABS.has(ACTIVE_TAB)){
-    const prevGroup = document.getElementById("groupFilter")?.value || ""
+    const prevGroup = document.getElementById("groupFilterSearch")?.value || ""
     const prevSort  = document.getElementById("sort")?.value || "popularity"
-    // Sort A→Z, only groups with missing films
     const groups = getGroupsForTab(ACTIVE_TAB)
       .filter(g=>(g.missing||[]).length>0)
       .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
-    const datalistId = `dl-${ACTIVE_TAB}`
-    const opts = groups.map(g=>`<option value="${g.name||""}"></option>`).join("")
 
     bar.innerHTML = `
-      <div style="position:relative">
-        <input id="groupFilter" list="${datalistId}" placeholder="Filter ${ACTIVE_TAB}…"
-          value="${prevGroup}"
+      <div style="position:relative" id="groupFilterWrap">
+        <input id="groupFilterSearch" placeholder="Filter ${ACTIVE_TAB}… (A→Z)"
+          value="${prevGroup}" autocomplete="off"
           style="min-width:220px;background:var(--bg3);border:1px solid var(--border2);
                  border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;
-                 font-size:.78rem;padding:.4rem .75rem;outline:none"/>
-        <datalist id="${datalistId}">${opts}</datalist>
+                 font-size:.78rem;padding:.4rem 2rem .4rem .75rem;outline:none"/>
+        <span id="groupFilterClear" onclick="clearGroupFilter()"
+          style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);
+                 color:var(--text3);cursor:pointer;font-size:.9rem;display:${prevGroup?"":"none"}">✕</span>
+        <div id="groupFilterDropdown" style="
+          display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:220px;
+          max-height:260px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);
+          border-radius:8px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.5)">
+        </div>
       </div>
       ${sortSelect(prevSort)}`
 
-    // Clear button support — if input cleared, re-render
-    document.getElementById("groupFilter")?.addEventListener("input", () => render())
+    _initGroupFilter(groups)
   } else {
     const prevSearch = document.getElementById("search")?.value || ""
     const prevYear   = document.getElementById("yearFilter")?.value || ""
@@ -106,7 +164,7 @@ function updateFilterBar(){
 }
 
 function sortSelect(cur){
-  const opts = [["popularity","Popularity"],["rating","Rating"],["votes","Votes"],["year","Year"],["title","Title"]]
+  const opts = [["popularity","Popularity"],["matches","Matches"],["rating","Rating"],["votes","Votes"],["year","Year"],["title","Title"]]
   return `<select id="sort">
     ${opts.map(([v,l])=>`<option value="${v}"${cur===v?" selected":""}>${l}</option>`).join("")}
   </select>`

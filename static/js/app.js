@@ -68,6 +68,12 @@ function setNavActive(tab){
 function setActiveTab(tab){
   ACTIVE_TAB = tab
   setNavActive(tab)
+  // Default sort for suggestions is matches, everything else is popularity
+  const sortEl = document.getElementById("sort")
+  if (sortEl){
+    if (tab === "suggestions" && sortEl.value === "popularity") sortEl.value = "matches"
+    if (tab !== "suggestions" && sortEl.value === "matches")    sortEl.value = "popularity"
+  }
   render()
 }
 
