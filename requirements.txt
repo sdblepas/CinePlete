@@ -4,4 +4,4 @@ requests==2.32.3
 pyyaml==6.0.2
 apscheduler==3.10.4
 defusedxml==0.7.1
-zipp==3.19.1
+zipp==3.23.0
