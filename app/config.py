@@ -21,7 +21,7 @@ DEFAULT_CONFIG = {
     "TMDB": {
         "TMDB_API_KEY": "",
         "TMDB_MIN_DELAY": 0.02,
-        "TMDB_WORKERS": 6
+        "TMDB_WORKERS": 6,
     },
     "CLASSICS": {
         "CLASSICS_PAGES": 4,

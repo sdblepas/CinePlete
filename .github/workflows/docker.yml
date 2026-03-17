@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -64,7 +64,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest pyyaml apscheduler defusedxml
+          pip install pytest pyyaml apscheduler defusedxml requests requests requests requests
 
       - name: Run tests
         run: pytest --tb=short -v
@@ -81,7 +81,7 @@ jobs:
       is_main:  ${{ steps.ctx.outputs.is_main }}
     steps:
       - name: Checkout (full history for tags)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -171,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -200,7 +200,7 @@ jobs:
       # ── Non-main → STG + branch-sha ──
       - name: Build & Push (STG)
         if: needs.version.outputs.is_main == 'false'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
