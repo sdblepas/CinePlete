@@ -149,6 +149,7 @@ function renderConfig(){
           ${field("cfg_jf_key",     "API Key",        jf.JELLYFIN_API_KEY      ||"", "secret")}
           ${field("cfg_jf_library", "Library Name",   jf.JELLYFIN_LIBRARY_NAME ||"Movies")}
         </div>
+
       </div>
 
       <div class="form-section">
@@ -237,16 +238,16 @@ async function saveConfig(){
       MEDIA_SERVER: v("cfg_media_server"),
     },
     PLEX:{
-      PLEX_URL:         v("cfg_plex_url"),
-      PLEX_TOKEN:       v("cfg_plex_token"),
-      LIBRARY_NAME:     v("cfg_library"),
-      PLEX_PAGE_SIZE:   vi("cfg_plex_page_size"),
-      SHORT_MOVIE_LIMIT:vi("cfg_short_limit"),
+      PLEX_URL:         v("cfg_plex_url")       || CONFIG?.PLEX?.PLEX_URL       || "",
+      PLEX_TOKEN:       v("cfg_plex_token")     || CONFIG?.PLEX?.PLEX_TOKEN     || "",
+      LIBRARY_NAME:     v("cfg_library")        || CONFIG?.PLEX?.LIBRARY_NAME   || "",
+      PLEX_PAGE_SIZE:   vi("cfg_plex_page_size") || CONFIG?.PLEX?.PLEX_PAGE_SIZE    || 500,
+      SHORT_MOVIE_LIMIT:vi("cfg_short_limit")    || CONFIG?.PLEX?.SHORT_MOVIE_LIMIT || 60,
     },
     JELLYFIN:{
-      JELLYFIN_URL:          v("cfg_jf_url"),
-      JELLYFIN_API_KEY:      v("cfg_jf_key"),
-      JELLYFIN_LIBRARY_NAME: v("cfg_jf_library"),
+      JELLYFIN_URL:          v("cfg_jf_url")     || CONFIG?.JELLYFIN?.JELLYFIN_URL          || "",
+      JELLYFIN_API_KEY:      v("cfg_jf_key")     || CONFIG?.JELLYFIN?.JELLYFIN_API_KEY      || "",
+      JELLYFIN_LIBRARY_NAME: v("cfg_jf_library") || CONFIG?.JELLYFIN?.JELLYFIN_LIBRARY_NAME || "Movies",
     },
     TMDB:{
       TMDB_API_KEY: v("cfg_tmdb_key"),
