@@ -1,208 +1,144 @@
 """
-Cineplete scheduler
--------------------
-Polls Plex library size at a configurable interval.
-If the movie count changes vs the last scan results, triggers a new scan.
-
-Controlled by config:
-    AUTOMATION.LIBRARY_POLL_INTERVAL  — minutes between checks (0 = disabled)
+Cineplete — Jellyfin scanner
+-----------------------------
+Drop-in replacement for plex_xml.py.
+Returns the exact same tuple: (plex_ids, directors, actors, stats, no_tmdb_guid)
+so scanner.py needs no logic changes.
 """
 
-import json
-import os
-
 import requests
-import defusedxml.ElementTree as ET
-from apscheduler.schedulers.background import BackgroundScheduler
+from collections import defaultdict
 
 from app.config import load_config
 from app.logger import get_logger
 
 log = get_logger(__name__)
 
-DATA_DIR     = "/data"
-RESULTS_FILE = f"{DATA_DIR}/results.json"
 
-_scheduler = None
-
-
-def _get_plex_movie_count() -> int | None:
-    """Return total movie count from Plex or None on error."""
-    try:
-        cfg      = load_config()
-        plex_cfg = cfg["PLEX"]
-        url      = plex_cfg["PLEX_URL"]
-        token    = plex_cfg["PLEX_TOKEN"]
-        library  = plex_cfg["LIBRARY_NAME"]
-
-        if not all([url, token, library]):
-            return None
-
-        r = requests.get(
-            f"{url}/library/sections",
-            params={"X-Plex-Token": token},
-            timeout=10,
-        )
-        r.raise_for_status()
-        root = ET.fromstring(r.text)
-
-        key = None
-        for d in root.findall("Directory"):
-            if d.attrib.get("title") == library:
-                key = d.attrib.get("key")
-                break
-
-        if not key:
-            return None
-
-        r2 = requests.get(
-            f"{url}/library/sections/{key}/all",
-            params={
-                "type": "1",
-                "X-Plex-Token": token,
-                "X-Plex-Container-Start": 0,
-                "X-Plex-Container-Size": 1,
-            },
-            timeout=10,
-        )
-        r2.raise_for_status()
-        root2 = ET.fromstring(r2.text)
-        total = root2.attrib.get("totalSize") or root2.attrib.get("size")
-        return int(total) if total else None
-
-    except Exception as e:
-        log.debug(f"Plex library poll error: {e}")
-        return None
-
-
-def _get_jellyfin_movie_count() -> int | None:
-    """Return total movie count from Jellyfin or None on error."""
-    try:
-        cfg    = load_config()
-        jf_cfg = cfg.get("JELLYFIN", {})
-        url    = jf_cfg.get("JELLYFIN_URL", "").rstrip("/")
-        token  = jf_cfg.get("JELLYFIN_API_KEY", "")
-        library = jf_cfg.get("JELLYFIN_LIBRARY_NAME", "Movies")
-
-        if not all([url, token, library]):
-            return None
-
-        # Get library ID
-        r = requests.get(
-            f"{url}/Library/MediaFolders",
-            headers={"X-Emby-Token": token},
-            timeout=10,
-        )
-        r.raise_for_status()
-        data = r.json()
-
-        lib_id = None
-        for item in data.get("Items", []):
-            if item.get("Name", "").lower() == library.lower():
-                lib_id = item["Id"]
-                break
-
-        if not lib_id:
-            return None
-
-        # Get count only — Limit=1 is enough to get TotalRecordCount
-        r2 = requests.get(
-            f"{url}/Items",
-            headers={"X-Emby-Token": token},
-            params={
-                "ParentId":         lib_id,
-                "IncludeItemTypes": "Movie",
-                "Recursive":        "true",
-                "Limit":            1,
-            },
-            timeout=10,
-        )
-        r2.raise_for_status()
-        return r2.json().get("TotalRecordCount")
-
-    except Exception as e:
-        log.debug(f"Jellyfin library poll error: {e}")
-        return None
-
-
-def _get_last_scan_count() -> int | None:
-    """Return the indexed_tmdb count from the last results.json."""
-    try:
-        with open(RESULTS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data.get("plex", {}).get("indexed_tmdb")
-    except Exception:
-        return None
-
-
-def _poll():
-    """Called by APScheduler. Triggers a scan if library size changed."""
-    # Import here to avoid circular import
-    from app.scanner import build_async, scan_state
-
-    if scan_state["running"]:
-        log.debug("Library poll skipped — scan already running")
-        return
-
+def _jf_get(path: str, params: dict = None) -> dict:
+    """Make an authenticated GET request to Jellyfin and return JSON."""
     cfg = load_config()
-    media_server = cfg.get("SERVER", {}).get("MEDIA_SERVER", "plex").lower()
-    if media_server == "jellyfin":
-        current = _get_jellyfin_movie_count()
-    else:
-        current = _get_plex_movie_count()
-    if current is None:
-        log.debug("Library poll: could not reach Plex")
-        return
+    jf  = cfg["JELLYFIN"]
 
-    last = _get_last_scan_count()
+    headers = {"X-Emby-Token": jf["JELLYFIN_API_KEY"]}
+    url     = jf["JELLYFIN_URL"].rstrip("/") + path
 
-    if last is None:
-        log.debug("Library poll: no previous scan results, skipping auto-trigger")
-        return
-
-    if current != last:
-        log.info(f"Library change detected: {last} → {current} movies — triggering auto-scan")
-        launched = build_async()
-        if not launched:
-            log.warning("Auto-scan could not start (lock busy)")
-    else:
-        log.debug(f"Library poll: no change ({current} movies)")
+    r = requests.get(url, headers=headers, params=params or {}, timeout=30)
+    r.raise_for_status()
+    return r.json()
 
 
-def start(interval_minutes: int):
-    """Start the background scheduler with the given poll interval."""
-    global _scheduler
-
-    if interval_minutes <= 0:
-        log.info("Library polling disabled (LIBRARY_POLL_INTERVAL = 0)")
-        return
-
-    if _scheduler and _scheduler.running:
-        _scheduler.shutdown(wait=False)
-
-    _scheduler = BackgroundScheduler(daemon=True)
-    _scheduler.add_job(
-        _poll,
-        trigger="interval",
-        minutes=interval_minutes,
-        id="library_poll",
-        replace_existing=True,
-    )
-    _scheduler.start()
-    log.info(f"Library polling started — checking every {interval_minutes} minute(s)")
+def _library_id(library_name: str) -> str:
+    """Resolve a library name to its Jellyfin item ID."""
+    data = _jf_get("/Library/MediaFolders")
+    for item in data.get("Items", []):
+        if item.get("Name", "").lower() == library_name.lower():
+            return item["Id"]
+    raise RuntimeError(f"Jellyfin library '{library_name}' not found")
 
 
-def stop():
-    """Stop the scheduler cleanly."""
-    global _scheduler
-    if _scheduler and _scheduler.running:
-        _scheduler.shutdown(wait=False)
-        log.info("Library polling stopped")
+def scan_movies():
+    """
+    Scan the configured Jellyfin movie library.
 
+    Returns:
+        plex_ids      dict[int, str]   — {tmdb_id: title}
+        directors     dict[str, set]   — {director_name: {tmdb_id, ...}}
+        actors        dict[str, set]   — {actor_name: {tmdb_id, ...}}
+        stats         dict             — scan statistics
+        no_tmdb_guid  list[dict]       — films without a TMDB provider ID
+    """
+    cfg     = load_config()
+    jf_cfg  = cfg["JELLYFIN"]
+    plex_cfg = cfg["PLEX"]   # SHORT_MOVIE_LIMIT and PAGE_SIZE live here
 
-def restart():
-    """Reload interval from config and restart scheduler."""
-    cfg      = load_config()
-    interval = int(cfg.get("AUTOMATION", {}).get("LIBRARY_POLL_INTERVAL", 30))
-    stop()
-    start(interval)
+    short_movie_limit = int(plex_cfg.get("SHORT_MOVIE_LIMIT", 60))
+    page_size         = int(plex_cfg.get("PLEX_PAGE_SIZE", 500))
+    library_name      = jf_cfg.get("JELLYFIN_LIBRARY_NAME", "Movies")
+
+    library_id = _library_id(library_name)
+    log.info(f"Jellyfin library '{library_name}' → ID {library_id}")
+
+    media_ids   = {}          # {tmdb_id: title}
+    directors   = defaultdict(set)
+    actors      = defaultdict(set)
+    no_tmdb_guid = []
+
+    start     = 0
+    scanned   = 0
+    skipped_short = 0
+
+    while True:
+        data = _jf_get("/Items", {
+            "ParentId":        library_id,
+            "IncludeItemTypes":"Movie",
+            "Recursive":       "true",
+            "Fields":          "ProviderIds,People,RunTimeTicks",
+            "StartIndex":      start,
+            "Limit":           page_size,
+        })
+
+        items = data.get("Items", [])
+        if not items:
+            break
+
+        for item in items:
+            scanned += 1
+
+            title = item.get("Name", "")
+            year  = str(item.get("ProductionYear", "")) or None
+
+            # RunTimeTicks → minutes (1 tick = 100 nanoseconds)
+            ticks      = item.get("RunTimeTicks") or 0
+            duration_min = ticks / 600_000_000
+
+            if duration_min and duration_min < short_movie_limit:
+                skipped_short += 1
+                continue
+
+            # TMDB ID — stored as plain string in ProviderIds.Tmdb
+            provider_ids = item.get("ProviderIds", {})
+            tmdb_raw     = provider_ids.get("Tmdb") or provider_ids.get("tmdb")
+
+            if not tmdb_raw:
+                no_tmdb_guid.append({"title": title, "year": year})
+                continue
+
+            try:
+                tmdb_id = int(tmdb_raw)
+            except (ValueError, TypeError):
+                no_tmdb_guid.append({"title": title, "year": year})
+                continue
+
+            media_ids[tmdb_id] = title
+
+            # People — directors and actors are in the same array
+            for person in item.get("People", []):
+                name      = person.get("Name", "").strip()
+                role_type = person.get("Type", "")
+                if not name:
+                    continue
+                if role_type == "Director":
+                    directors[name].add(tmdb_id)
+                elif role_type == "Actor":
+                    actors[name].add(tmdb_id)
+
+        total = data.get("TotalRecordCount", 0)
+        start += len(items)
+        if start >= total:
+            break
+
+    # Only keep directors/actors appearing in 2+ films
+    directors = {k: v for k, v in directors.items() if len(v) > 1}
+    actors    = {k: v for k, v in actors.items()    if len(v) > 1}
+
+    stats = {
+        "scanned_items":  scanned,
+        "indexed_tmdb":   len(media_ids),
+        "skipped_short":  skipped_short,
+        "directors_kept": len(directors),
+        "actors_kept":    len(actors),
+        "no_tmdb_guid":   len(no_tmdb_guid),
+    }
+
+    return media_ids, directors, actors, stats, no_tmdb_guid
