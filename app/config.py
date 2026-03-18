@@ -103,14 +103,24 @@ def save_config(data: dict) -> dict:
 
 
 def is_configured(cfg: dict | None = None) -> bool:
-    cfg = cfg or load_config()
+    cfg          = cfg or load_config()
+    tmdb         = cfg.get("TMDB", {})
+    media_server = cfg.get("SERVER", {}).get("MEDIA_SERVER", "plex").lower()
 
-    plex = cfg["PLEX"]
-    tmdb = cfg["TMDB"]
+    if not str(tmdb.get("TMDB_API_KEY", "")).strip():
+        return False
 
-    return all([
-        str(plex.get("PLEX_URL", "")).strip(),
-        str(plex.get("PLEX_TOKEN", "")).strip(),
-        str(plex.get("LIBRARY_NAME", "")).strip(),
-        str(tmdb.get("TMDB_API_KEY", "")).strip(),
-    ])
+    if media_server == "jellyfin":
+        jf = cfg.get("JELLYFIN", {})
+        return all([
+            str(jf.get("JELLYFIN_URL", "")).strip(),
+            str(jf.get("JELLYFIN_API_KEY", "")).strip(),
+            str(jf.get("JELLYFIN_LIBRARY_NAME", "")).strip(),
+        ])
+    else:
+        plex = cfg.get("PLEX", {})
+        return all([
+            str(plex.get("PLEX_URL", "")).strip(),
+            str(plex.get("PLEX_TOKEN", "")).strip(),
+            str(plex.get("LIBRARY_NAME", "")).strip(),
+        ])

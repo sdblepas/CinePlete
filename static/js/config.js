@@ -237,17 +237,19 @@ async function saveConfig(){
     SERVER:{
       MEDIA_SERVER: v("cfg_media_server"),
     },
+    // For the inactive server, the fields are hidden (display:none) so their
+    // DOM inputs don't exist — fall back to last saved CONFIG values
     PLEX:{
-      PLEX_URL:         v("cfg_plex_url")       || CONFIG?.PLEX?.PLEX_URL       || "",
-      PLEX_TOKEN:       v("cfg_plex_token")     || CONFIG?.PLEX?.PLEX_TOKEN     || "",
-      LIBRARY_NAME:     v("cfg_library")        || CONFIG?.PLEX?.LIBRARY_NAME   || "",
+      PLEX_URL:         document.getElementById("cfg_plex_url")    ? v("cfg_plex_url")    : (CONFIG?.PLEX?.PLEX_URL    ||""),
+      PLEX_TOKEN:       document.getElementById("cfg_plex_token")  ? v("cfg_plex_token")  : (CONFIG?.PLEX?.PLEX_TOKEN  ||""),
+      LIBRARY_NAME:     document.getElementById("cfg_library")     ? v("cfg_library")     : (CONFIG?.PLEX?.LIBRARY_NAME||""),
       PLEX_PAGE_SIZE:   vi("cfg_plex_page_size") || CONFIG?.PLEX?.PLEX_PAGE_SIZE    || 500,
       SHORT_MOVIE_LIMIT:vi("cfg_short_limit")    || CONFIG?.PLEX?.SHORT_MOVIE_LIMIT || 60,
     },
     JELLYFIN:{
-      JELLYFIN_URL:          v("cfg_jf_url")     || CONFIG?.JELLYFIN?.JELLYFIN_URL          || "",
-      JELLYFIN_API_KEY:      v("cfg_jf_key")     || CONFIG?.JELLYFIN?.JELLYFIN_API_KEY      || "",
-      JELLYFIN_LIBRARY_NAME: v("cfg_jf_library") || CONFIG?.JELLYFIN?.JELLYFIN_LIBRARY_NAME || "Movies",
+      JELLYFIN_URL:          document.getElementById("cfg_jf_url")     ? v("cfg_jf_url")     : (CONFIG?.JELLYFIN?.JELLYFIN_URL          ||""),
+      JELLYFIN_API_KEY:      document.getElementById("cfg_jf_key")     ? v("cfg_jf_key")     : (CONFIG?.JELLYFIN?.JELLYFIN_API_KEY      ||""),
+      JELLYFIN_LIBRARY_NAME: document.getElementById("cfg_jf_library") ? v("cfg_jf_library") : (CONFIG?.JELLYFIN?.JELLYFIN_LIBRARY_NAME ||"Movies"),
     },
     TMDB:{
       TMDB_API_KEY: v("cfg_tmdb_key"),
