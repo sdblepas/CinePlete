@@ -64,6 +64,12 @@ function toggleSecret(id){
   }
 }
 
+function toggleMediaServer(){
+  const val = document.getElementById("cfg_media_server")?.value
+  document.getElementById("plex-fields").style.display     = val === "plex"     ? "block" : "none"
+  document.getElementById("jellyfin-fields").style.display = val === "jellyfin" ? "block" : "none"
+}
+
 function renderConfig(){
   const c     = document.getElementById("content")
   const cfg   = CONFIG||{}
@@ -74,6 +80,8 @@ function renderConfig(){
   const act   = cfg.ACTOR_HITS  ||{}
   const auto  = cfg.AUTOMATION  ||{}
   const tg    = cfg.TELEGRAM    ||{}
+  const jf    = cfg.JELLYFIN    ||{}
+  const srv   = cfg.SERVER      ||{}
 
   const field = (id, label, value, type="text") => {
     const isSecret = type === "secret"
@@ -206,12 +214,20 @@ async function saveConfig(){
   const vc = id => document.getElementById(id)?.checked||false
 
   const payload = {
+    SERVER:{
+      MEDIA_SERVER: v("cfg_media_server"),
+    },
     PLEX:{
       PLEX_URL:         v("cfg_plex_url"),
       PLEX_TOKEN:       v("cfg_plex_token"),
       LIBRARY_NAME:     v("cfg_library"),
       PLEX_PAGE_SIZE:   vi("cfg_plex_page_size"),
       SHORT_MOVIE_LIMIT:vi("cfg_short_limit"),
+    },
+    JELLYFIN:{
+      JELLYFIN_URL:          v("cfg_jf_url"),
+      JELLYFIN_API_KEY:      v("cfg_jf_key"),
+      JELLYFIN_LIBRARY_NAME: v("cfg_jf_library"),
     },
     TMDB:{
       TMDB_API_KEY: v("cfg_tmdb_key"),

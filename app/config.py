@@ -10,6 +10,12 @@ DEFAULT_CONFIG = {
     "SERVER": {
         "UI_PORT": 8787,
         "TZ": "Asia/Jerusalem",
+        "MEDIA_SERVER": "plex",   # "plex" or "jellyfin"
+    },
+    "JELLYFIN": {
+        "JELLYFIN_URL": "",
+        "JELLYFIN_API_KEY": "",
+        "JELLYFIN_LIBRARY_NAME": "Movies",
     },
     "PLEX": {
         "PLEX_URL": "",
@@ -21,7 +27,7 @@ DEFAULT_CONFIG = {
     "TMDB": {
         "TMDB_API_KEY": "",
         "TMDB_MIN_DELAY": 0.02,
-        "TMDB_WORKERS": 6,
+        "TMDB_WORKERS": 6,       # concurrent workers for TMDB calls (1-10)
     },
     "CLASSICS": {
         "CLASSICS_PAGES": 4,

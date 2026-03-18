@@ -5,7 +5,6 @@ from datetime import datetime, date
 from collections import Counter
 
 from app.config import load_config
-from app.plex_xml import scan_movies
 from app.tmdb import TMDB
 from app.overrides import load_json, save_json, remove_value
 from app.logger import get_logger
@@ -111,8 +110,15 @@ def build():
     wishlist_movies   = set(overrides.get("wishlist_movies", []))
     rec_fetched_ids   = set(overrides.get("rec_fetched_ids", []))
 
-    # ---- PLEX SCAN --------------------------------------------
+    # ---- MEDIA SERVER SCAN ------------------------------------
     _set_step(1)
+    media_server = cfg.get("SERVER", {}).get("MEDIA_SERVER", "plex").lower()
+    if media_server == "jellyfin":
+        from app.jellyfin_api import scan_movies
+        log.info("Using Jellyfin scanner")
+    else:
+        from app.plex_xml import scan_movies
+        log.info("Using Plex scanner")
     plex_ids, directors_map, actors_map, plex_stats, no_tmdb_guid = scan_movies()
     log.info(f"Plex movies detected: {len(plex_ids)}")
 
