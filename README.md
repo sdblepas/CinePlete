@@ -1,4 +1,4 @@
-# 🎬 Cineplete — Plex Movie Audit
+# 🎬 Cineplete — Plex & Jellyfin Movie Audit
 
 [![Build & Publish Docker](https://github.com/sdblepas/CinePlete/actions/workflows/docker.yml/badge.svg)](https://github.com/sdblepas/CinePlete/actions/workflows/docker.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/sdblepas/cineplete)](https://hub.docker.com/r/sdblepas/cineplete)
@@ -11,6 +11,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-powered-green)
 
 ![Plex](https://img.shields.io/badge/Plex-compatible-orange)
+![Jellyfin](https://img.shields.io/badge/Jellyfin-compatible-7B2FBE)
 ![Radarr](https://img.shields.io/badge/Radarr-integration-purple)
 ![TMDB](https://img.shields.io/badge/TMDB-API-blue)
 ![Homelab](https://img.shields.io/badge/homelab-friendly-blue)
@@ -22,36 +23,56 @@
 
 Ever wondered **which movies you're missing** from your favorite franchises, directors, or actors?
 
-**Cineplete scans your Plex library in seconds and shows exactly what's missing.**
+**Cineplete scans your Plex or Jellyfin library in seconds and shows exactly what's missing.**
 
-✔ Missing movies from franchises  
-✔ Missing films from directors you collect  
-✔ Popular movies from actors already in your library  
-✔ Classic films missing from your collection  
-✔ Tailor-made suggestions based on your library  
+✔ Missing movies from franchises
+✔ Missing films from directors you collect
+✔ Popular movies from actors already in your library
+✔ Classic films missing from your collection
+✔ Tailor-made suggestions based on your library
 
 All in a **beautiful dashboard with charts and Radarr integration.**
+Supports **both Plex and Jellyfin** — switchable from the Config tab.
 
 ![Cineplete Demo](assets/Demo.gif)
 
 ## Overview
 
-**Cineplete** is a self-hosted Docker tool that scans your Plex movie library and identifies:
+**Cineplete** is a self-hosted Docker tool that scans your **Plex or Jellyfin** movie library and identifies:
 
 - Missing movies from franchises
 - Missing films from directors you already collect
 - Popular films from actors already present in your library
 - Classic movies missing from your collection
 - Personalized suggestions based on what your library recommends
-- Metadata issues in Plex (missing TMDB GUID or broken matches)
+- Metadata issues (missing TMDB GUID or broken matches)
 - Wishlist management
 - Direct Radarr integration
 
-The tool includes a **web UI dashboard with charts**, a **Logs tab** for diagnostics, and performs **ultra-fast Plex scans (~2 seconds)**.
+The tool includes a **web UI dashboard with charts**, a **Logs tab** for diagnostics, and performs **ultra-fast library scans** (~2 seconds for Plex, depends on library size for Jellyfin).
 
 ---
 
 ## Features
+
+### Media Server Support — Plex & Jellyfin
+
+Cineplete supports two media servers. Switch between them from the **Config tab** — no restart needed.
+
+| | Plex | Jellyfin |
+|---|---|---|
+| Scanner | Native XML API | Jellyfin HTTP API |
+| Speed | ~2s for 1000 movies | Depends on library size |
+| Credentials | URL + Token | URL + API Key |
+| Library polling | ✔ | ✔ |
+| Test Connection | ✔ | ✔ |
+
+**Jellyfin setup:**
+1. In Jellyfin, go to **Dashboard → API Keys** and create a new key for Cineplete.
+2. In Cineplete Config, set `Media Server` to `Jellyfin`, enter the URL, API key, and library name.
+3. Use the **Test Connection** button to verify before saving.
+
+---
 
 ### Ultra Fast Plex Scanner
 
@@ -241,12 +262,26 @@ Configuration is stored in `config/config.yml` and editable from the **Config** 
 
 | Key | Description |
 |-----|-------------|
-| `PLEX_URL` | URL of your Plex server |
-| `PLEX_TOKEN` | Plex authentication token |
-| `LIBRARY_NAME` | Name of the movie library |
+| `MEDIA_SERVER` | `plex` or `jellyfin` (default: `plex`) |
 | `TMDB_API_KEY` | TMDB classic API Key (v3) — **not** the Read Access Token |
 
 > ⚠️ Use the **API Key** found under TMDB → Settings → API → **API Key** (short alphanumeric string starting with letters/numbers). Do **not** use the Read Access Token (long JWT string starting with `eyJ`).
+
+**Plex settings:**
+
+| Key | Description |
+|-----|-------------|
+| `PLEX_URL` | URL of your Plex server |
+| `PLEX_TOKEN` | Plex authentication token |
+| `LIBRARY_NAME` | Name of the movie library in Plex |
+
+**Jellyfin settings:**
+
+| Key | Description |
+|-----|-------------|
+| `JELLYFIN_URL` | URL of your Jellyfin server (e.g. `http://192.168.1.10:8096`) |
+| `JELLYFIN_API_KEY` | API key from Jellyfin Dashboard → API Keys |
+| `JELLYFIN_LIBRARY_NAME` | Name of the movie library in Jellyfin (default: `Movies`) |
 
 **Advanced settings** (accessible via the UI "Advanced settings" section):
 
@@ -259,6 +294,7 @@ Configuration is stored in `config/config.yml` and editable from the **Config** 
 | `ACTOR_MIN_VOTES` | 500 | Minimum votes for an actor's film to appear |
 | `ACTOR_MAX_RESULTS_PER_ACTOR` | 10 | Max missing films shown per actor |
 | `PLEX_PAGE_SIZE` | 500 | Plex API page size |
+| `JELLYFIN_PAGE_SIZE` | 500 | Jellyfin API page size |
 | `SHORT_MOVIE_LIMIT` | 60 | Films shorter than this (minutes) are ignored |
 | `SUGGESTIONS_MAX_RESULTS` | 100 | Maximum suggestions to return |
 | `SUGGESTIONS_MIN_SCORE` | 2 | Minimum number of your films that must recommend a suggestion |
@@ -327,6 +363,8 @@ CinePlete/
 │   ├── web.py                # FastAPI backend + all API endpoints
 │   ├── scanner.py            # 8-step scan engine (threaded)
 │   ├── plex_xml.py           # Plex XML API scanner
+│   ├── jellyfin_api.py       # Jellyfin HTTP API scanner
+│   ├── scheduler.py          # Library auto-poll scheduler (Plex & Jellyfin)
 │   ├── tmdb.py               # TMDB API client (cached, key-safe, error logging)
 │   ├── overrides.py          # Ignore/wishlist/rec_fetched_ids helpers
 │   ├── config.py             # Config loader/saver with deep-merge
@@ -340,7 +378,9 @@ CinePlete/
 │   └── config.yml            # Default config template
 ├── tests/
 │   ├── test_config.py
+│   ├── test_jellyfin_api.py  # 16 unit tests for Jellyfin scanner
 │   ├── test_overrides.py
+│   ├── test_scheduler.py
 │   └── test_scoring.py
 ├── docker-compose.yml
 ├── Dockerfile
@@ -378,6 +418,7 @@ All persistent data lives in the mounted `/data` volume and survives container u
 | POST | `/api/wishlist/add` | Adds a movie to wishlist |
 | POST | `/api/wishlist/remove` | Removes from wishlist |
 | POST | `/api/radarr/add` | Sends a movie to Radarr |
+| POST | `/api/jellyfin/test` | Tests Jellyfin connectivity and library access |
 | GET | `/api/logs` | Returns last N lines of cineplete.log |
 
 ---
@@ -389,6 +430,7 @@ All persistent data lives in the mounted `/data` volume and survives container u
 - Docker (multi-arch: amd64 + arm64)
 - TMDB API v3
 - Plex XML API
+- Jellyfin HTTP API (Emby-compatible)
 - Chart.js
 - Tailwind CSS (CDN)
 
@@ -397,27 +439,29 @@ All persistent data lives in the mounted `/data` volume and survives container u
 ## Architecture
 
 ```
-Plex Server
-     │
-     │ XML API (~2s for 1000 movies)
-     ▼
-Plex XML Scanner  ──→  {tmdb_id: plex_title}
-     │
-     │ TMDB API (cached, key-stripped, rotating log)
-     ▼
-8-Step Scan Engine (background thread + progress state)
-     │
-     ├── Franchises (TMDB collections)
-     ├── Directors (person_credits)
-     ├── Actors (person_credits)
-     ├── Classics (top_rated)
-     └── Suggestions (recommendations × library)
-     │
-     ▼
-FastAPI Backend  ──→  results.json
-     │
-     ▼
-Web UI Dashboard (charts, filters, wishlist, Radarr, logs)
+Plex Server                  Jellyfin Server
+     │                              │
+     │ XML API (~2s/1000 movies)    │ HTTP API
+     ▼                              ▼
+Plex XML Scanner          Jellyfin API Scanner
+          \                    /
+           └──── scan_movies() ────┘
+                      │
+                      │ {tmdb_id: title}
+                      ▼
+     8-Step Scan Engine (background thread + progress state)
+                      │
+          ┌───────────┼───────────────┐
+          ▼           ▼               ▼
+     Franchises   Directors   Actors / Classics / Suggestions
+          │           │               │
+          └───────────┴───────────────┘
+                      │ TMDB API (cached)
+                      ▼
+              FastAPI Backend  ──→  results.json
+                      │
+                      ▼
+        Web UI Dashboard (charts, filters, wishlist, Radarr, logs)
 ```
 
 ---
@@ -426,22 +470,29 @@ Web UI Dashboard (charts, filters, wishlist, Radarr, logs)
 
 ## Présentation
 
-**Cineplete** est un outil Docker auto-hébergé permettant d'analyser une bibliothèque Plex et de détecter :
+**Cineplete** est un outil Docker auto-hébergé permettant d'analyser une bibliothèque **Plex ou Jellyfin** et de détecter :
 
 - Les films manquants dans les sagas
 - Les films manquants de réalisateurs déjà présents
 - Les films populaires d'acteurs présents
 - Les classiques absents
 - Les suggestions personnalisées basées sur votre bibliothèque
-- Les problèmes de métadonnées Plex
+- Les problèmes de métadonnées
 - La gestion d'une wishlist
 - L'intégration Radarr
 
-L'outil propose une **interface web avec graphiques**, un **onglet Logs** pour le diagnostic, et un **scan Plex ultra rapide (~2 secondes)**.
+L'outil propose une **interface web avec graphiques**, un **onglet Logs** pour le diagnostic, et un **scan ultra rapide** (~2 secondes avec Plex). Les deux serveurs multimédia sont sélectionnables depuis l'onglet Config, sans redémarrage.
 
 ---
 
 ## Fonctionnalités
+
+### Support Plex & Jellyfin
+
+Cineplete prend en charge deux serveurs multimédia, sélectionnables depuis l'onglet Config :
+
+- **Plex** — utilise l'API XML native (~2s pour 1000 films)
+- **Jellyfin** — utilise l'API HTTP Jellyfin, avec bouton **Test de connexion** intégré
 
 ### Scanner Plex ultra rapide
 
@@ -596,12 +647,26 @@ Fichier : `config/config.yml` — éditable depuis l'onglet **Config** de l'inte
 
 | Clé | Description |
 |-----|-------------|
-| `PLEX_URL` | URL du serveur Plex |
-| `PLEX_TOKEN` | Token d'authentification Plex |
-| `LIBRARY_NAME` | Nom de la bibliothèque films |
+| `MEDIA_SERVER` | `plex` ou `jellyfin` (défaut : `plex`) |
 | `TMDB_API_KEY` | Clé API TMDB classique (v3) — **pas** le Read Access Token |
 
 > ⚠️ Utiliser la **clé API** disponible sous TMDB → Paramètres → API → **Clé API** (chaîne alphanumérique courte). Ne **pas** utiliser le Read Access Token (longue chaîne JWT commençant par `eyJ`).
+
+**Paramètres Plex :**
+
+| Clé | Description |
+|-----|-------------|
+| `PLEX_URL` | URL du serveur Plex |
+| `PLEX_TOKEN` | Token d'authentification Plex |
+| `LIBRARY_NAME` | Nom de la bibliothèque films dans Plex |
+
+**Paramètres Jellyfin :**
+
+| Clé | Description |
+|-----|-------------|
+| `JELLYFIN_URL` | URL du serveur Jellyfin (ex. `http://192.168.1.10:8096`) |
+| `JELLYFIN_API_KEY` | Clé API depuis Jellyfin → Tableau de bord → Clés API |
+| `JELLYFIN_LIBRARY_NAME` | Nom de la bibliothèque films dans Jellyfin (défaut : `Movies`) |
 
 **Paramètres avancés :**
 
@@ -614,6 +679,7 @@ Fichier : `config/config.yml` — éditable depuis l'onglet **Config** de l'inte
 | `ACTOR_MIN_VOTES` | 500 | Votes minimum pour les films d'acteurs |
 | `ACTOR_MAX_RESULTS_PER_ACTOR` | 10 | Nombre max de films par acteur |
 | `PLEX_PAGE_SIZE` | 500 | Taille de page API Plex |
+| `JELLYFIN_PAGE_SIZE` | 500 | Taille de page API Jellyfin |
 | `SHORT_MOVIE_LIMIT` | 60 | Films plus courts que cette durée (minutes) ignorés |
 | `SUGGESTIONS_MAX_RESULTS` | 100 | Nombre maximum de suggestions |
 | `SUGGESTIONS_MIN_SCORE` | 2 | Nombre minimum de vos films devant recommander une suggestion |
