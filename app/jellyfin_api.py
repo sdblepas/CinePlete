@@ -48,12 +48,11 @@ def scan_movies():
         stats         dict             — scan statistics
         no_tmdb_guid  list[dict]       — films without a TMDB provider ID
     """
-    cfg     = load_config()
-    jf_cfg  = cfg["JELLYFIN"]
-    plex_cfg = cfg["PLEX"]   # SHORT_MOVIE_LIMIT and PAGE_SIZE live here
+    cfg    = load_config()
+    jf_cfg = cfg["JELLYFIN"]
 
-    short_movie_limit = int(plex_cfg.get("SHORT_MOVIE_LIMIT", 60))
-    page_size         = int(plex_cfg.get("PLEX_PAGE_SIZE", 500))
+    short_movie_limit = int(cfg.get("PLEX", {}).get("SHORT_MOVIE_LIMIT", 60))
+    page_size         = int(cfg.get("PLEX", {}).get("PLEX_PAGE_SIZE", 500))
     library_name      = jf_cfg.get("JELLYFIN_LIBRARY_NAME", "Movies")
 
     library_id = _library_id(library_name)

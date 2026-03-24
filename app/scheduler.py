@@ -151,7 +151,7 @@ def _poll():
     else:
         current = _get_plex_movie_count()
     if current is None:
-        log.debug("Library poll: could not reach Plex")
+        log.debug("Library poll: could not reach media server")
         return
 
     last = _get_last_scan_count()

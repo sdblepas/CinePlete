@@ -243,8 +243,8 @@ async function saveConfig(){
       PLEX_URL:         document.getElementById("cfg_plex_url")    ? v("cfg_plex_url")    : (CONFIG?.PLEX?.PLEX_URL    ||""),
       PLEX_TOKEN:       document.getElementById("cfg_plex_token")  ? v("cfg_plex_token")  : (CONFIG?.PLEX?.PLEX_TOKEN  ||""),
       LIBRARY_NAME:     document.getElementById("cfg_library")     ? v("cfg_library")     : (CONFIG?.PLEX?.LIBRARY_NAME||""),
-      PLEX_PAGE_SIZE:   vi("cfg_plex_page_size") || CONFIG?.PLEX?.PLEX_PAGE_SIZE    || 500,
-      SHORT_MOVIE_LIMIT:vi("cfg_short_limit")    || CONFIG?.PLEX?.SHORT_MOVIE_LIMIT || 60,
+      PLEX_PAGE_SIZE:   vi("cfg_plex_page_size") ?? CONFIG?.PLEX?.PLEX_PAGE_SIZE    ?? 500,
+      SHORT_MOVIE_LIMIT:vi("cfg_short_limit")    ?? CONFIG?.PLEX?.SHORT_MOVIE_LIMIT ?? 60,
     },
     JELLYFIN:{
       JELLYFIN_URL:          document.getElementById("cfg_jf_url")     ? v("cfg_jf_url")     : (CONFIG?.JELLYFIN?.JELLYFIN_URL          ||""),

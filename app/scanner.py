@@ -122,7 +122,7 @@ def build():
         log.info("Using Plex scanner")
     _set_step(1)
     plex_ids, directors_map, actors_map, plex_stats, no_tmdb_guid = scan_movies()
-    log.info(f"Plex movies detected: {len(plex_ids)}")
+    log.info(f"Movies detected: {len(plex_ids)}")
 
     tmdb = TMDB(tmdb_api_key)
     movie_cache: dict = {}
