@@ -78,6 +78,14 @@ def save_snapshot(plex_ids: dict):
         pass
 
 
+def read_results() -> dict | None:
+    try:
+        with open(RESULTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 def write_results(results: dict):
     os.makedirs(DATA_DIR, exist_ok=True)
     tmp = RESULTS_FILE + ".tmp"
