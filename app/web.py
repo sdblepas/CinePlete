@@ -279,7 +279,7 @@ def overseerr_add(payload: dict = Body(...)):
     if not cfg.get("OVERSEERR_ENABLED"):
         return {"ok": False, "error": "Overseerr disabled"}
     tmdb_id = int(payload.get("tmdb"))
-    headers = {"Authorization": f"Bearer {cfg['OVERSEERR_API_KEY']}",
+    headers = {"X-Api-Key": cfg["OVERSEERR_API_KEY"],
                "Content-Type": "application/json"}
     try:
         r = requests.post(
@@ -304,7 +304,7 @@ def jellyseerr_add(payload: dict = Body(...)):
     if not cfg.get("JELLYSEERR_ENABLED"):
         return {"ok": False, "error": "Jellyseerr disabled"}
     tmdb_id = int(payload.get("tmdb"))
-    headers = {"Authorization": f"Bearer {cfg['JELLYSEERR_API_KEY']}",
+    headers = {"X-Api-Key": cfg["JELLYSEERR_API_KEY"],
                "Content-Type": "application/json"}
     try:
         r = requests.post(
