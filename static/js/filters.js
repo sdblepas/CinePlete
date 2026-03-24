@@ -4,6 +4,18 @@
 
 const GROUP_TABS = new Set(["franchises","directors","actors"])
 let _activeGroupFilter = ""
+let _activeGenreFilter = ""
+
+/* Static TMDB genre ID map — stable, no API call needed */
+const GENRE_MAP = {
+  28:"Action", 12:"Adventure", 16:"Animation", 35:"Comedy",
+  80:"Crime", 99:"Documentary", 18:"Drama", 10751:"Family",
+  14:"Fantasy", 36:"History", 27:"Horror", 10402:"Music",
+  9648:"Mystery", 10749:"Romance", 878:"Sci-Fi", 53:"Thriller",
+  10752:"War", 37:"Western"
+}
+
+function getGenreFilter() { return _activeGenreFilter }
 
 function yearBucket(y){
   const yr = parseInt(y||"0",10)
@@ -90,6 +102,7 @@ function applyFilters(list){
   let out = list.filter(m => {
     if (search && !(m.title||"").toLowerCase().includes(search)) return false
     if (year && yearBucket(m.year) !== year) return false
+    if (_activeGenreFilter && !(m.genre_ids||[]).includes(parseInt(_activeGenreFilter))) return false
     return true
   })
 
@@ -128,29 +141,37 @@ function updateFilterBar(){
       .filter(g=>(g.missing||[]).length>0)
       .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
 
+    const prevGenreG = _activeGenreFilter
+
     bar.innerHTML = `
       <div style="position:relative" id="groupFilterWrap">
         <input id="groupFilterSearch" placeholder="Filter ${ACTIVE_TAB}… (A→Z)"
           value="${prevGroup}" autocomplete="off"
-          style="min-width:220px;background:var(--bg3);border:1px solid var(--border2);
+          style="min-width:200px;background:var(--bg3);border:1px solid var(--border2);
                  border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;
                  font-size:.78rem;padding:.4rem 2rem .4rem .75rem;outline:none"/>
         <span id="groupFilterClear" onclick="clearGroupFilter()"
           style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);
                  color:var(--text3);cursor:pointer;font-size:.9rem;display:${prevGroup?"":"none"}">✕</span>
         <div id="groupFilterDropdown" style="
-          display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:220px;
+          display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:200px;
           max-height:260px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);
           border-radius:8px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.5)">
         </div>
       </div>
+      <select id="genreFilter">
+        <option value="">All genres</option>
+        ${Object.entries(GENRE_MAP).map(([id,name])=>`<option value="${id}"${prevGenreG===id?" selected":""}>${name}</option>`).join("")}
+      </select>
       ${sortSelect(prevSort)}`
 
     _initGroupFilter(groups)
+    updateExportBtn()
   } else {
     const prevSearch = document.getElementById("search")?.value || ""
     const prevYear   = document.getElementById("yearFilter")?.value || ""
     const prevSort   = document.getElementById("sort")?.value || "popularity"
+    const prevGenre  = _activeGenreFilter
     const yearOpts   = [["","All years"],["2020s","2020s"],["2010s","2010s"],["2000s","2000s"],["1990s","1990s"],["older","Older"]]
 
     bar.innerHTML = `
@@ -158,8 +179,18 @@ function updateFilterBar(){
       <select id="yearFilter">
         ${yearOpts.map(([v,l])=>`<option value="${v}"${prevYear===v?" selected":""}>${l}</option>`).join("")}
       </select>
+      <select id="genreFilter">
+        <option value="">All genres</option>
+        ${Object.entries(GENRE_MAP).map(([id,name])=>`<option value="${id}"${prevGenre===id?" selected":""}>${name}</option>`).join("")}
+      </select>
       ${sortSelect(prevSort)}`
   }
+  updateExportBtn()
+}
+
+function onGenreFilterChange(val) {
+  _activeGenreFilter = val
+  render()
 }
 
 function sortSelect(cur){

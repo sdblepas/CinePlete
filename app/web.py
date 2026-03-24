@@ -5,7 +5,7 @@ import requests
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Body, Query
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from app.config import load_config, save_config, is_configured
 from app.scanner import build, build_async, scan_state
@@ -266,6 +266,148 @@ def radarr_add(payload: dict = Body(...)):
 
     return {"ok": True}
 
+
+
+# --------------------------------------------------
+# Movie detail (for modal)
+# --------------------------------------------------
+
+@app.get("/api/movie/{tmdb_id}")
+def api_movie_detail(tmdb_id: int):
+    from app.tmdb import TMDB
+    cfg     = load_config()
+    api_key = cfg.get("TMDB", {}).get("TMDB_API_KEY")
+    if not api_key:
+        return {"error": "TMDB not configured"}
+    t  = TMDB(api_key)
+    md = t.movie(tmdb_id)
+    if not md:
+        return {"error": "Movie not found"}
+    credits_url = (
+        f"https://api.themoviedb.org/3/movie/{tmdb_id}/credits"
+        f"?api_key={api_key}"
+    )
+    credits = t.get(credits_url)
+    cast = [
+        {
+            "name":      c["name"],
+            "character": c.get("character", ""),
+            "profile":   t.poster_url(c.get("profile_path")),
+        }
+        for c in (credits.get("cast") or [])[:8]
+    ]
+    backdrop = (
+        f"https://image.tmdb.org/t/p/w1280{md['backdrop_path']}"
+        if md.get("backdrop_path") else None
+    )
+    return {
+        "tmdb":     tmdb_id,
+        "title":    md.get("title"),
+        "year":     (md.get("release_date") or "")[:4],
+        "poster":   t.poster_url(md.get("poster_path")),
+        "backdrop": backdrop,
+        "overview": md.get("overview", ""),
+        "tagline":  md.get("tagline", ""),
+        "rating":   md.get("vote_average", 0),
+        "votes":    md.get("vote_count", 0),
+        "runtime":  md.get("runtime"),
+        "genres":   [g["name"] for g in md.get("genres") or []],
+        "cast":     cast,
+        "tmdb_url": f"https://www.themoviedb.org/movie/{tmdb_id}",
+    }
+
+
+# --------------------------------------------------
+# Export
+# --------------------------------------------------
+
+@app.get("/api/export")
+def api_export(format: str = Query(default="csv"), tab: str = Query(default="wishlist")):
+    results = read_results()
+    if not results:
+        return PlainTextResponse("No scan data available", status_code=404)
+
+    movies: list = []
+    if tab == "wishlist":
+        movies = results.get("wishlist", [])
+    elif tab == "classics":
+        movies = results.get("classics", [])
+    elif tab == "suggestions":
+        movies = results.get("suggestions", [])
+    elif tab in ("franchises", "directors", "actors"):
+        for g in results.get(tab, []):
+            movies.extend(g.get("missing", []))
+
+    filename = f"cineplete-{tab}.csv"
+
+    if format == "letterboxd":
+        lines = ["Title,Year,tmdbID,WatchedDate,Rating10,Review"]
+        for m in movies:
+            title = (m.get("title") or "").replace('"', '""')
+            lines.append(f'"{title}",{m.get("year","")},{m.get("tmdb","")},,,')
+        return PlainTextResponse(
+            "\n".join(lines), media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # Default: CSV
+    lines = ["Title,Year,TMDB ID,Rating,Votes,Popularity"]
+    for m in movies:
+        title = (m.get("title") or "").replace('"', '""')
+        lines.append(
+            f'"{title}",{m.get("year","")},{m.get("tmdb","")}'
+            f',{m.get("rating","")},{m.get("votes","")},{round(m.get("popularity",0),1)}'
+        )
+    return PlainTextResponse(
+        "\n".join(lines), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# --------------------------------------------------
+# Global search
+# --------------------------------------------------
+
+@app.get("/api/search")
+def api_search(q: str = Query(default="")):
+    if not q or len(q) < 2:
+        return {"results": []}
+    results = read_results()
+    if not results:
+        return {"results": []}
+
+    q_lower = q.lower()
+    hits: list = []
+
+    def _match(m: dict, tab: str, group: str = ""):
+        if q_lower in (m.get("title") or "").lower():
+            hits.append({**m, "_tab": tab, "_group": group})
+
+    for f in results.get("franchises", []):
+        for m in f.get("missing", []):
+            _match(m, "franchises", f.get("name", ""))
+    for d in results.get("directors", []):
+        for m in d.get("missing", []):
+            _match(m, "directors", d.get("name", ""))
+    for a in results.get("actors", []):
+        for m in a.get("missing", []):
+            _match(m, "actors", a.get("name", ""))
+    for m in results.get("classics", []):
+        _match(m, "classics")
+    for m in results.get("suggestions", []):
+        _match(m, "suggestions")
+    for m in results.get("wishlist", []):
+        _match(m, "wishlist")
+
+    # Deduplicate by tmdb ID, keep first occurrence
+    seen: set = set()
+    unique: list = []
+    for h in hits:
+        if h.get("tmdb") not in seen:
+            seen.add(h.get("tmdb"))
+            unique.append(h)
+
+    return {"results": unique[:40], "total": len(unique)}
 
 
 # --------------------------------------------------

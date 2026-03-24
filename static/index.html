@@ -32,6 +32,17 @@
       --sidebar-w:  240px;
     }
 
+    html[data-theme="light"] {
+      --bg:         #f2f2f5;
+      --bg2:        #ffffff;
+      --bg3:        #eaeaef;
+      --border:     #d8d8e0;
+      --border2:    #c8c8d0;
+      --text:       #1a1a24;
+      --text2:      #505060;
+      --text3:      #909098;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -618,6 +629,319 @@
     details > summary::-webkit-details-marker { display: none; }
     details[open] > summary .chevron { transform: rotate(180deg); }
     .chevron { transition: transform .2s; display: inline-block; margin-left: .3rem; }
+
+    /* ── POSTER CARD GRID ─────────────────────── */
+    .grid-posters {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: .85rem;
+    }
+    .pc {
+      position: relative; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+      transition: transform .2s, border-color .2s, box-shadow .2s;
+      cursor: pointer;
+    }
+    .pc:hover {
+      transform: translateY(-4px) scale(1.01);
+      border-color: rgba(245,197,24,.5);
+      box-shadow: 0 16px 40px rgba(0,0,0,.6);
+    }
+    .pc img.pc-img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
+    .pc .pc-no-img {
+      width: 100%; aspect-ratio: 2/3; background: var(--bg2);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text3); font-size: .65rem; flex-direction: column; gap: .35rem;
+    }
+    .pc-info { padding: .5rem .6rem .65rem; }
+    .pc-title {
+      font-family: 'Syne', sans-serif; font-weight: 600; font-size: .78rem;
+      color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: .15rem;
+    }
+    .pc-meta { font-size: .66rem; color: var(--text3); display: flex; gap: .4rem; align-items: center; }
+    .pc-rating { color: var(--gold); }
+    .pc-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,.92) 100%);
+      opacity: 0; transition: opacity .2s;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: .6rem; gap: .3rem;
+    }
+    .pc:hover .pc-overlay { opacity: 1; }
+    .pc-overlay-title {
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: .78rem; color: #fff;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .pc-overlay-actions { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .pc-overlay-actions .btn-sm { font-size: .6rem; padding: 3px 8px; }
+    .pc-check {
+      position: absolute; top: .45rem; left: .45rem;
+      width: 17px; height: 17px; accent-color: var(--gold);
+      cursor: pointer; opacity: 0; transition: opacity .15s; z-index: 10;
+    }
+    .pc:hover .pc-check, .pc-check:checked { opacity: 1; }
+    .pc.selected { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-glow); }
+
+    /* ── MOVIE DETAIL MODAL ───────────────────── */
+    #movieModal {
+      position: fixed; inset: 0; z-index: 2000;
+      display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+      background: rgba(0,0,0,.75); backdrop-filter: blur(6px);
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    #movieModal.open { opacity: 1; pointer-events: all; }
+    #movieModalBox {
+      position: relative; width: 100%; max-width: 860px; max-height: 90vh;
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
+      transform: scale(.96) translateY(8px);
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+    }
+    #movieModal.open #movieModalBox { transform: scale(1) translateY(0); }
+    #movieModalBackdrop {
+      height: 170px; width: 100%; background: var(--bg3); object-fit: cover; display: block; flex-shrink: 0;
+    }
+    #movieModalClose {
+      position: absolute; top: .75rem; right: .75rem;
+      width: 30px; height: 30px; background: rgba(0,0,0,.65); border: none;
+      border-radius: 50%; color: #fff; font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; z-index: 10;
+      transition: background .15s;
+    }
+    #movieModalClose:hover { background: rgba(239,68,68,.8); }
+    #movieModalBody { display: flex; overflow: hidden; flex: 1; }
+    #movieModalPoster { width: 150px; flex-shrink: 0; object-fit: cover; border-right: 1px solid var(--border); }
+    #movieModalPosterPH {
+      width: 150px; flex-shrink: 0; background: var(--bg3);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text3); font-size: .68rem; border-right: 1px solid var(--border);
+    }
+    #movieModalInfo {
+      flex: 1; padding: 1.1rem 1.3rem; overflow-y: auto;
+      display: flex; flex-direction: column; gap: .65rem;
+    }
+    #movieModalTitle { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.25rem; color: var(--text); line-height: 1.2; }
+    #movieModalTagline { font-size: .78rem; color: var(--text3); font-style: italic; }
+    .modal-genres { display: flex; flex-wrap: wrap; gap: .3rem; }
+    .modal-genre-chip { font-size: .63rem; padding: 2px 9px; border-radius: 20px; background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); }
+    #movieModalOverview { font-size: .8rem; color: var(--text2); line-height: 1.65; }
+    .modal-cast { display: flex; gap: .55rem; overflow-x: auto; padding-bottom: .35rem; }
+    .cast-card { flex-shrink: 0; width: 66px; text-align: center; }
+    .cast-card img, .cast-card .cast-no-photo {
+      width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+      background: var(--bg3); display: block; margin: 0 auto .25rem;
+    }
+    .cast-card .cast-no-photo { display: flex; align-items: center; justify-content: center; font-size: .55rem; color: var(--text3); }
+    .cast-name { font-size: .6rem; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cast-char { font-size: .56rem; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .modal-actions { display: flex; gap: .5rem; flex-wrap: wrap; padding-top: .5rem; border-top: 1px solid var(--border); }
+    .modal-stats { display: flex; gap: 1rem; font-size: .75rem; color: var(--text3); }
+    .modal-stats strong { color: var(--text); }
+
+    /* ── BATCH BAR ────────────────────────────── */
+    #batchBar {
+      position: fixed; bottom: 1.5rem;
+      left: 50%; transform: translateX(-50%) translateY(8px);
+      background: var(--bg2); border: 1px solid var(--gold);
+      border-radius: 12px; padding: .65rem 1.1rem;
+      display: flex; align-items: center; gap: .85rem;
+      z-index: 1500;
+      box-shadow: 0 8px 32px rgba(0,0,0,.7), 0 0 0 1px rgba(245,197,24,.1);
+      white-space: nowrap;
+      opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    }
+    #batchBar.visible { opacity: 1; pointer-events: all; transform: translateX(-50%) translateY(0); }
+    #batchCount { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .82rem; color: var(--gold); }
+
+    /* ── GLOBAL SEARCH ────────────────────────── */
+    #globalSearch {
+      position: fixed; inset: 0; z-index: 3000;
+      background: rgba(0,0,0,.8); backdrop-filter: blur(8px);
+      display: flex; align-items: flex-start; justify-content: center; padding-top: 8vh;
+      opacity: 0; pointer-events: none; transition: opacity .18s;
+    }
+    #globalSearch.open { opacity: 1; pointer-events: all; }
+    #gsBox {
+      width: 100%; max-width: 600px; background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 14px; overflow: hidden;
+      transform: translateY(-10px) scale(.98);
+      transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+    }
+    #globalSearch.open #gsBox { transform: translateY(0) scale(1); }
+    #gsInput {
+      width: 100%; background: transparent; border: none; outline: none;
+      color: var(--text); font-family: 'DM Mono', monospace; font-size: .92rem;
+      padding: .95rem 1.1rem; border-bottom: 1px solid var(--border);
+    }
+    #gsResults { max-height: 400px; overflow-y: auto; }
+    .gs-item {
+      display: flex; align-items: center; gap: .8rem;
+      padding: .55rem 1.1rem; cursor: pointer;
+      border-bottom: 1px solid var(--border); transition: background .12s;
+    }
+    .gs-item:last-child { border-bottom: none; }
+    .gs-item:hover, .gs-item.gs-focused { background: var(--bg3); }
+    .gs-item img { width: 34px; height: 51px; object-fit: cover; border-radius: 4px; background: var(--bg3); flex-shrink: 0; }
+    .gs-item-info { flex: 1; min-width: 0; }
+    .gs-title { font-size: .83rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gs-meta { font-size: .7rem; color: var(--text3); margin-top: .1rem; }
+    .gs-tab { font-size: .6rem; padding: 2px 7px; border-radius: 4px; background: var(--bg3); border: 1px solid var(--border2); color: var(--text3); flex-shrink: 0; }
+    #gsEmpty { padding: 1.75rem; text-align: center; color: var(--text3); font-size: .8rem; }
+    #gsHint { padding: .55rem 1.1rem; font-size: .65rem; color: var(--text3); display: flex; justify-content: space-between; border-top: 1px solid var(--border); }
+
+    /* ── TOPBAR ICON BUTTONS ──────────────────── */
+    .topbar-btn {
+      width: 30px; height: 30px; background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 7px; cursor: pointer; color: var(--text2);
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s; flex-shrink: 0;
+    }
+    .topbar-btn:hover { background: var(--border); color: var(--text); }
+    #exportBtn {
+      font-size: .68rem; padding: 4px 11px; border-radius: 7px;
+      border: 1px solid var(--border2); background: var(--bg3);
+      color: var(--text2); cursor: pointer; font-family: 'DM Mono', monospace;
+      transition: background .15s; white-space: nowrap; display: none;
+    }
+    #exportBtn:hover { background: var(--border); color: var(--text); }
+
+    /* ── KEYBOARD SHORTCUTS MODAL ─────────────── */
+    #shortcutsModal {
+      position: fixed; inset: 0; z-index: 4000;
+      background: rgba(0,0,0,.75); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .18s;
+    }
+    #shortcutsModal.open { opacity: 1; pointer-events: all; }
+    #shortcutsBox { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 1.4rem; width: 340px; }
+    .sc-row { display: flex; justify-content: space-between; align-items: center; padding: .35rem 0; font-size: .78rem; border-bottom: 1px solid var(--border); }
+    .sc-row:last-child { border-bottom: none; }
+    .sc-key { font-family: 'DM Mono', monospace; background: var(--bg3); border: 1px solid var(--border2); border-radius: 5px; padding: 1px 7px; font-size: .7rem; color: var(--text2); }
+    .sc-desc { color: var(--text2); }
+
+    /* ── DASHBOARD KPI STRIP ──────────────────── */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: .6rem;
+      margin-bottom: .85rem;
+    }
+    .kpi-tile {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: .85rem 1rem;
+      transition: border-color .15s, background .15s;
+    }
+    .kpi-tile[onclick]:hover {
+      border-color: var(--border2);
+      background: var(--bg3);
+    }
+    .kpi-value {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.6rem;
+      line-height: 1;
+      letter-spacing: -.04em;
+    }
+    .kpi-label {
+      font-size: .58rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text3);
+      margin-top: .3rem;
+    }
+    .kpi-sub {
+      font-size: .65rem;
+      color: var(--text3);
+      margin-top: .2rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── DASHBOARD ROWS ───────────────────────── */
+    .db-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: .75rem;
+      margin-bottom: .75rem;
+    }
+    .db-row-2 { grid-template-columns: 1fr 1fr; }
+
+    .card-compact { padding: .85rem 1rem; }
+    .card-compact .card-title { margin-bottom: .6rem; font-size: .6rem; }
+
+    /* ── CHART + LEGEND SIDE BY SIDE ──────────── */
+    .chart-duo {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+    .chart-donut-wrap {
+      width: 110px;
+      height: 110px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .legend-stack { flex: 1; min-width: 0; }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .22rem 0;
+      font-size: .74rem;
+      border-radius: 4px;
+      transition: background .12s;
+    }
+    .legend-row[onclick]:hover { background: var(--bg3); }
+    .legend-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-label { color: var(--text2); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .legend-val   { font-weight: 600; color: var(--text); flex-shrink: 0; }
+
+    /* ── FRANCHISE PROGRESS BARS ──────────────── */
+    .franchise-bars { display: flex; flex-direction: column; gap: .55rem; }
+    .fbr { transition: opacity .12s; }
+    .fbr:hover { opacity: .8; }
+    .fbr-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: .2rem;
+    }
+    .fbr-name {
+      font-size: .72rem;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 75%;
+    }
+    .fbr-count { font-size: .65rem; color: var(--text3); flex-shrink: 0; }
+    .fbr-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .fbr-fill {
+      height: 100%;
+      background: var(--gold);
+      border-radius: 4px;
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+    }
+
+    @media(max-width:1100px){
+      .kpi-strip { grid-template-columns: repeat(3,1fr); }
+      .db-row    { grid-template-columns: 1fr 1fr; }
+    }
+    @media(max-width:800px){
+      .kpi-strip,.db-row,.db-row-2 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 
@@ -702,6 +1026,14 @@
     <header id="topbar">
       <div id="page-title">Dashboard</div>
       <div id="topFilters" style="display:none"></div>
+      <button id="exportBtn" onclick="exportCurrent()" title="Export">↓ Export</button>
+      <button class="topbar-btn" id="searchBtn" onclick="openGlobalSearch()" title="Global search (/)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      </button>
+      <button class="topbar-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark mode">
+        <svg id="themeSunIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <svg id="themeMoonIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
     </header>
     <div id="content"></div>
   </div>
@@ -709,10 +1041,61 @@
   <!-- TOAST CONTAINER -->
   <div id="toastContainer"></div>
 
+  <!-- MOVIE DETAIL MODAL -->
+  <div id="movieModal" onclick="handleModalBgClick(event)">
+    <div id="movieModalBox">
+      <button id="movieModalClose" onclick="closeMovieModal()">✕</button>
+      <img id="movieModalBackdrop" src="" alt="" style="display:none"/>
+      <div id="movieModalBody">
+        <div id="movieModalPosterPH">NO IMG</div>
+        <div id="movieModalInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BATCH ACTION BAR -->
+  <div id="batchBar">
+    <span id="batchCount">0 selected</span>
+    <button class="btn-sm btn-radarr" onclick="batchAddToRadarr()">+ All to Radarr</button>
+    <button class="btn-sm btn-wishlist" onclick="batchAddToWishlist()">☆ All to Wishlist</button>
+    <button class="btn-sm btn-ignore" onclick="clearSelection()">✕ Clear</button>
+  </div>
+
+  <!-- GLOBAL SEARCH MODAL -->
+  <div id="globalSearch" onclick="handleGsBgClick(event)">
+    <div id="gsBox">
+      <input id="gsInput" placeholder="Search all tabs…" autocomplete="off"/>
+      <div id="gsResults"></div>
+      <div id="gsHint">
+        <span>↑↓ navigate &nbsp; Enter select &nbsp; Esc close</span>
+        <span style="color:var(--text3)">/ or ⌘K to open</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEYBOARD SHORTCUTS MODAL -->
+  <div id="shortcutsModal" onclick="closeShortcuts()">
+    <div id="shortcutsBox" onclick="event.stopPropagation()">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:1rem;color:var(--text)">Keyboard Shortcuts</div>
+      <div class="sc-row"><span class="sc-desc">Global search</span><span class="sc-key">/ or ⌘K</span></div>
+      <div class="sc-row"><span class="sc-desc">Rescan library</span><span class="sc-key">R</span></div>
+      <div class="sc-row"><span class="sc-desc">Close modal / search</span><span class="sc-key">Esc</span></div>
+      <div class="sc-row"><span class="sc-desc">Dashboard</span><span class="sc-key">1</span></div>
+      <div class="sc-row"><span class="sc-desc">Franchises</span><span class="sc-key">2</span></div>
+      <div class="sc-row"><span class="sc-desc">Directors</span><span class="sc-key">3</span></div>
+      <div class="sc-row"><span class="sc-desc">Actors</span><span class="sc-key">4</span></div>
+      <div class="sc-row"><span class="sc-desc">Classics</span><span class="sc-key">5</span></div>
+      <div class="sc-row"><span class="sc-desc">Suggestions</span><span class="sc-key">6</span></div>
+      <div class="sc-row"><span class="sc-desc">Wishlist</span><span class="sc-key">7</span></div>
+      <div class="sc-row"><span class="sc-desc">This help</span><span class="sc-key">?</span></div>
+    </div>
+  </div>
+
   <script src="/static/js/api.js?v=__VERSION__"></script>
   <script src="/static/js/scan.js?v=__VERSION__"></script>
   <script src="/static/js/filters.js?v=__VERSION__"></script>
   <script src="/static/js/render.js?v=__VERSION__"></script>
+  <script src="/static/js/modal.js?v=__VERSION__"></script>
   <script src="/static/js/config.js?v=__VERSION__"></script>
   <script src="/static/js/app.js?v=__VERSION__"></script>
 </body>
