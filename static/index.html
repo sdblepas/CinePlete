@@ -818,6 +818,125 @@
     .sc-row:last-child { border-bottom: none; }
     .sc-key { font-family: 'DM Mono', monospace; background: var(--bg3); border: 1px solid var(--border2); border-radius: 5px; padding: 1px 7px; font-size: .7rem; color: var(--text2); }
     .sc-desc { color: var(--text2); }
+
+    /* ── DASHBOARD KPI STRIP ──────────────────── */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: .6rem;
+      margin-bottom: .85rem;
+    }
+    .kpi-tile {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: .85rem 1rem;
+      transition: border-color .15s, background .15s;
+    }
+    .kpi-tile[onclick]:hover {
+      border-color: var(--border2);
+      background: var(--bg3);
+    }
+    .kpi-value {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.6rem;
+      line-height: 1;
+      letter-spacing: -.04em;
+    }
+    .kpi-label {
+      font-size: .58rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text3);
+      margin-top: .3rem;
+    }
+    .kpi-sub {
+      font-size: .65rem;
+      color: var(--text3);
+      margin-top: .2rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── DASHBOARD ROWS ───────────────────────── */
+    .db-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: .75rem;
+      margin-bottom: .75rem;
+    }
+    .db-row-2 { grid-template-columns: 1fr 1fr; }
+
+    .card-compact { padding: .85rem 1rem; }
+    .card-compact .card-title { margin-bottom: .6rem; font-size: .6rem; }
+
+    /* ── CHART + LEGEND SIDE BY SIDE ──────────── */
+    .chart-duo {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+    .chart-duo canvas { flex-shrink: 0; }
+    .legend-stack { flex: 1; min-width: 0; }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .22rem 0;
+      font-size: .74rem;
+      border-radius: 4px;
+      transition: background .12s;
+    }
+    .legend-row[onclick]:hover { background: var(--bg3); }
+    .legend-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-label { color: var(--text2); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .legend-val   { font-weight: 600; color: var(--text); flex-shrink: 0; }
+
+    /* ── FRANCHISE PROGRESS BARS ──────────────── */
+    .franchise-bars { display: flex; flex-direction: column; gap: .55rem; }
+    .fbr { transition: opacity .12s; }
+    .fbr:hover { opacity: .8; }
+    .fbr-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: .2rem;
+    }
+    .fbr-name {
+      font-size: .72rem;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 75%;
+    }
+    .fbr-count { font-size: .65rem; color: var(--text3); flex-shrink: 0; }
+    .fbr-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .fbr-fill {
+      height: 100%;
+      background: var(--gold);
+      border-radius: 4px;
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+    }
+
+    @media(max-width:1100px){
+      .kpi-strip { grid-template-columns: repeat(3,1fr); }
+      .db-row    { grid-template-columns: 1fr 1fr; }
+    }
+    @media(max-width:800px){
+      .kpi-strip,.db-row,.db-row-2 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 

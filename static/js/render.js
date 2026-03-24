@@ -195,12 +195,12 @@ function emptyStateHTML(msg){
 function renderDashboard(){
   const c = document.getElementById("content")
   const s = DATA.scores||{}
-  // Support both old "plex" key and new "media_server" key
   const p = DATA.media_server || DATA.plex || {}
 
   const ignoredFranchises = new Set(DATA._ignored_franchises||[])
+  const activeFranchises  = (DATA.franchises||[]).filter(f=>!ignoredFranchises.has(f.name))
   let fComplete=0,fOne=0,fMore=0
-  ;(DATA.franchises||[]).filter(f=>!ignoredFranchises.has(f.name)).forEach(f=>{
+  activeFranchises.forEach(f=>{
     const n=(f.missing||[]).length
     if(n===0) fComplete++; else if(n===1) fOne++; else fMore++
   })
@@ -225,137 +225,240 @@ function renderDashboard(){
 
   const topActors = (DATA.charts?.top_actors||[]).slice(0,10)
 
-  const scoreCardHTML = (label, val, color, tab="") => {
-    const v = parseFloat(val)||0
-    const click = tab ? `onclick="setActiveTab('${tab}')" style="cursor:pointer"` : ""
-    return `
-    <div class="score-card" ${click}>
-      <div class="score-label">${label}</div>
-      <div class="score-value" style="color:${color}">${v}<span style="font-size:1rem;opacity:.6">%</span></div>
-      <div class="score-bar-wrap"><div class="score-bar" style="width:0%;background:${color}" data-pct="${v}"></div></div>
+  // Aggregate all unique missing movies for analysis
+  const seenMissing = new Set()
+  const allMissing  = []
+  const pushUniq    = m=>{ if(m.tmdb&&!seenMissing.has(m.tmdb)){ seenMissing.add(m.tmdb); allMissing.push(m) } }
+  activeFranchises.forEach(f=>(f.missing||[]).forEach(pushUniq))
+  ;(DATA.directors||[]).forEach(d=>(d.missing||[]).forEach(pushUniq))
+  ;(DATA.actors   ||[]).forEach(a=>(a.missing||[]).forEach(pushUniq))
+  ;(DATA.classics ||[]).forEach(pushUniq)
+
+  // Missing by decade
+  const decades={"Pre-1970":0,"1970s":0,"1980s":0,"1990s":0,"2000s":0,"2010s":0,"2020s":0}
+  allMissing.forEach(m=>{
+    const yr=parseInt(m.year||0)
+    if(!yr) return
+    if(yr>=2020)      decades["2020s"]++
+    else if(yr>=2010) decades["2010s"]++
+    else if(yr>=2000) decades["2000s"]++
+    else if(yr>=1990) decades["1990s"]++
+    else if(yr>=1980) decades["1980s"]++
+    else if(yr>=1970) decades["1970s"]++
+    else              decades["Pre-1970"]++
+  })
+
+  // Genre gap (top 8 genres in missing movies)
+  const genreCounts={}
+  allMissing.forEach(m=>(m.genre_ids||[]).forEach(gid=>{
+    if(GENRE_MAP[gid]) genreCounts[gid]=(genreCounts[gid]||0)+1
+  }))
+  const topGenres=Object.entries(genreCounts)
+    .sort((a,b)=>b[1]-a[1]).slice(0,8)
+    .map(([id,n])=>({name:GENRE_MAP[id],count:n}))
+
+  // Top incomplete franchises (by absolute missing count)
+  const topIncomplete=activeFranchises
+    .filter(f=>(f.missing||[]).length>0)
+    .sort((a,b)=>(b.missing||[]).length-(a.missing||[]).length)
+    .slice(0,7)
+
+  const totalMissing = allMissing.length
+
+  // helpers
+  const kpi=(val,label,color,tab="",sub="")=>{
+    const click=tab?`onclick="setActiveTab('${tab}')" style="cursor:pointer"`:"style=\"\""
+    return `<div class="kpi-tile" ${click}>
+      <div class="kpi-value" style="color:${color}">${val}</div>
+      <div class="kpi-label">${label}</div>
+      ${sub?`<div class="kpi-sub">${sub}</div>`:""}
     </div>`
   }
 
-  const srow = (label,val,color="")=>`
+  const leg=(col,label,val,tab="")=>{
+    const click=tab?`onclick="setActiveTab('${tab}')" style="cursor:pointer"`:"style=\"\""
+    return `<div class="legend-row" ${click}>
+      <span class="legend-dot" style="background:${col}"></span>
+      <span class="legend-label">${label}</span>
+      <b class="legend-val">${val}</b>
+    </div>`
+  }
+
+  const srow=(label,val,color="")=>`
   <div class="stat-row">
     <span class="stat-label">${label}</span>
     <span class="stat-val"${color?` style="color:${color}"`:""}>${val}</span>
   </div>`
 
-  const leg = (col,label,val,tab="")=>{
-    const click = tab ? `onclick="setActiveTab('${tab}')" style="cursor:pointer;user-select:none"` : ""
-    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.78rem" ${click}>
-      <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
-      <span style="color:var(--text2);flex:1">${label}</span>
-      <b style="color:var(--text)">${val}</b>
-    </div>`
-  }
-
-  c.innerHTML = `
-  <div class="grid-4" style="margin-bottom:.85rem">
-    ${scoreCardHTML("Franchise Completion", s.franchise_completion_pct??0, "#F5C518", "franchises")}
-    ${scoreCardHTML("Directors Score",      s.directors_proxy_pct     ??0, "#3b82f6", "directors")}
-    ${scoreCardHTML("Classics Coverage",    s.classics_proxy_pct      ??0, "#a855f7", "classics")}
-    ${scoreCardHTML("Global Score",         s.global_cinema_score     ??0, "#22c55e")}
+  c.innerHTML=`
+  <!-- KPI Strip -->
+  <div class="kpi-strip">
+    ${kpi(Math.round(s.franchise_completion_pct??0)+"%","Franchise","#F5C518","franchises",`${fComplete} complete · ${fOne+fMore} gaps`)}
+    ${kpi(Math.round(s.directors_proxy_pct??0)+"%","Directors","#3b82f6","directors",`${(DATA.directors||[]).length} tracked`)}
+    ${kpi(Math.round(s.classics_proxy_pct??0)+"%","Classics","#a855f7","classics",`${classicsHave}/${classicsTotal} in library`)}
+    ${kpi(Math.round(s.global_cinema_score??0)+"%","Global Score","#22c55e","","composite")}
+    ${kpi(totalMissing,"Total Missing","var(--text)","franchises","unique films")}
+    ${kpi((DATA.wishlist||[]).length,"Wishlist","var(--gold)","wishlist","saved for later")}
   </div>
 
-  <div class="grid-3" style="margin-bottom:.85rem">
-    <div class="card">
+  <!-- Doughnuts row -->
+  <div class="db-row" style="margin-bottom:.75rem">
+    <div class="card card-compact">
       <div class="card-title">Franchise Status</div>
-      <canvas id="cFranchise" height="170"></canvas>
-      <div style="margin-top:.85rem">
-        ${leg("#22c55e","Complete",   fComplete,  "franchises")}
-        ${leg("#F5C518","Missing 1",  fOne,       "franchises")}
-        ${leg("#ef4444","Missing 2+", fMore,      "franchises")}
+      <div class="chart-duo">
+        <canvas id="cFranchise" width="110" height="110" style="flex-shrink:0"></canvas>
+        <div class="legend-stack">
+          ${leg("#22c55e","Complete",fComplete,"franchises")}
+          ${leg("#F5C518","Missing 1",fOne,"franchises")}
+          ${leg("#ef4444","Missing 2+",fMore,"franchises")}
+        </div>
       </div>
     </div>
-    <div class="card">
+    <div class="card card-compact">
       <div class="card-title">Classics Coverage</div>
-      <canvas id="cClassics" height="170"></canvas>
-      <div style="margin-top:.85rem">
-        ${leg("#a855f7","In Library", classicsHave, "classics")}
-        ${leg("#2a2a30","Missing",    classicsMiss, "classics")}
+      <div class="chart-duo">
+        <canvas id="cClassics" width="110" height="110" style="flex-shrink:0"></canvas>
+        <div class="legend-stack">
+          ${leg("#a855f7","In Library",classicsHave,"classics")}
+          ${leg("#27272a","Missing",classicsMiss,"classics")}
+        </div>
       </div>
     </div>
-    <div class="card">
+    <div class="card card-compact">
       <div class="card-title">Metadata Health</div>
-      <canvas id="cMeta" height="170"></canvas>
-      <div style="margin-top:.85rem">
-        ${leg("#22c55e","Valid TMDB", okMovies)}
-        ${leg("#F5C518","No GUID",    noGuid,   "notmdb")}
-        ${leg("#ef4444","No Match",   noMatch,  "nomatch")}
+      <div class="chart-duo">
+        <canvas id="cMeta" width="110" height="110" style="flex-shrink:0"></canvas>
+        <div class="legend-stack">
+          ${leg("#22c55e","Valid TMDB",okMovies)}
+          ${leg("#F5C518","No GUID",noGuid,"notmdb")}
+          ${leg("#ef4444","No Match",noMatch,"nomatch")}
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="grid-31">
-    <div class="card">
+  <!-- Analysis row: decade + genre gap -->
+  <div class="db-row db-row-2" style="margin-bottom:.75rem">
+    <div class="card card-compact">
+      <div class="card-title">Missing by Decade</div>
+      <canvas id="cDecade" height="150"></canvas>
+    </div>
+    <div class="card card-compact">
+      <div class="card-title">Genre Gap — Top Missing</div>
+      <canvas id="cGenre" height="150"></canvas>
+    </div>
+  </div>
+
+  <!-- Bottom row: actors + franchise bars + library stats -->
+  <div class="db-row">
+    <div class="card card-compact">
       <div class="card-title">Top Actors in Library</div>
       <canvas id="cActors" height="200"></canvas>
     </div>
-    <div class="card">
-      <div class="card-title">Directors — Missing Films</div>
-      <canvas id="cDirs" height="200"></canvas>
+    <div class="card card-compact">
+      <div class="card-title">Most Incomplete Franchises</div>
+      <div class="franchise-bars">
+        ${topIncomplete.map(f=>{
+          const pct=f.total?Math.round((f.have/f.total)*100):100
+          return `<div class="fbr" onclick="setActiveTab('franchises')" style="cursor:pointer">
+            <div class="fbr-header">
+              <span class="fbr-name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
+              <span class="fbr-count">${f.have}/${f.total}</span>
+            </div>
+            <div class="fbr-track"><div class="fbr-fill" style="width:0%" data-pct="${pct}"></div></div>
+          </div>`
+        }).join("")||`<div style="color:var(--text3);font-size:.8rem;padding:.5rem 0">All franchises complete 🎉</div>`}
+      </div>
     </div>
-    <div class="card">
+    <div class="card card-compact">
       <div class="card-title">Library Stats</div>
-      ${srow("Scanned items",      p.scanned_items??0)}
-      ${srow("Indexed TMDB",       p.indexed_tmdb ??0)}
-      ${srow("Shorts skipped",     p.skipped_short??0)}
-      ${srow("No TMDB GUID",       noGuid,  noGuid  ?"var(--amber)":"")}
-      ${srow("TMDB no match",      noMatch, noMatch ?"var(--red)":"")}
-      ${srow("Franchises tracked", (DATA.franchises||[]).filter(f=>!ignoredFranchises.has(f.name)).length)}
-      ${srow("Directors tracked",  (DATA.directors ||[]).length)}
-      ${srow("Wishlist",           (DATA.wishlist  ||[]).length)}
+      <div>
+        ${srow("Scanned",     p.scanned_items??0)}
+        ${srow("Indexed",     p.indexed_tmdb ??0)}
+        ${srow("Shorts skip", p.skipped_short??0)}
+        ${srow("No GUID",     noGuid,  noGuid ?"var(--amber)":"")}
+        ${srow("No match",    noMatch, noMatch?"var(--red)":"")}
+        ${srow("Franchises",  activeFranchises.length)}
+        ${srow("Directors",   (DATA.directors||[]).length)}
+        ${srow("Suggestions", (DATA.suggestions||[]).length)}
+      </div>
+      <div class="card-title" style="margin-top:1rem">Director Coverage</div>
+      <canvas id="cDirs" height="75"></canvas>
     </div>
   </div>`
 
   requestAnimationFrame(()=>{
-    document.querySelectorAll(".score-bar").forEach(el=>{
-      setTimeout(()=>{ el.style.width = el.dataset.pct+"%" }, 80)
+    // Animate franchise progress bars
+    document.querySelectorAll(".fbr-fill").forEach(el=>{
+      setTimeout(()=>{ el.style.width=el.dataset.pct+"%" },80)
     })
 
     Chart.defaults.color       = "#606070"
     Chart.defaults.font.family = "'DM Mono',monospace"
     Chart.defaults.font.size   = 11
 
-    const doughnut = (labels,data,colors,onClick)=>({
+    const doughnut=(labels,data,colors,onClick)=>({
       type:"doughnut",
       data:{labels,datasets:[{data,backgroundColor:colors,borderColor:"#141416",borderWidth:3,hoverOffset:6}]},
       options:{
         cutout:"65%", animation:{duration:700},
         plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed}`}}},
-        onClick: (e,els)=>{ if(els.length&&onClick) onClick(els[0].index) }
+        onClick:(e,els)=>{ if(els.length&&onClick) onClick(els[0].index) }
       }
     })
 
-    mkChart("cFranchise", doughnut(
-      ["Complete","Missing 1","Missing 2+"],
-      [fComplete,fOne,fMore],
-      ["#22c55e","#F5C518","#ef4444"],
-      i=>{ if(i>0) setActiveTab("franchises") }
+    mkChart("cFranchise",doughnut(
+      ["Complete","Missing 1","Missing 2+"],[fComplete,fOne,fMore],
+      ["#22c55e","#F5C518","#ef4444"],i=>{ if(i>0) setActiveTab("franchises") }
     ))
-    mkChart("cClassics", doughnut(
-      ["In Library","Missing"],
-      [classicsHave,classicsMiss],
-      ["#a855f7","#27272a"],
-      i=>{ if(i===1) setActiveTab("classics") }
+    mkChart("cClassics",doughnut(
+      ["In Library","Missing"],[classicsHave,classicsMiss],
+      ["#a855f7","#27272a"],i=>{ if(i===1) setActiveTab("classics") }
     ))
-    mkChart("cMeta", doughnut(
-      ["Valid TMDB","No GUID","No Match"],
-      [okMovies,noGuid,noMatch],
-      ["#22c55e","#F5C518","#ef4444"],
-      i=>{ if(i===1) setActiveTab("notmdb"); else if(i===2) setActiveTab("nomatch") }
+    mkChart("cMeta",doughnut(
+      ["Valid TMDB","No GUID","No Match"],[okMovies,noGuid,noMatch],
+      ["#22c55e","#F5C518","#ef4444"],i=>{ if(i===1) setActiveTab("notmdb"); else if(i===2) setActiveTab("nomatch") }
     ))
 
+    // Missing by decade
+    const dLabels=Object.keys(decades).filter(k=>decades[k]>0)
+    mkChart("cDecade",{
+      type:"bar",
+      data:{labels:dLabels,datasets:[{data:dLabels.map(k=>decades[k]),
+        backgroundColor:dLabels.map((_,i)=>`hsl(${210+i*18},65%,${48+i*3}%)`),
+        borderRadius:5,borderSkipped:false}]},
+      options:{
+        animation:{duration:700},
+        scales:{
+          x:{grid:{display:false},ticks:{color:"#9090a0"}},
+          y:{grid:{color:"#1a1a1e"},ticks:{color:"#606070",precision:0}}
+        },
+        plugins:{legend:{display:false}}
+      }
+    })
+
+    // Genre gap
+    mkChart("cGenre",{
+      type:"bar",
+      data:{labels:topGenres.map(g=>g.name),datasets:[{data:topGenres.map(g=>g.count),
+        backgroundColor:topGenres.map((_,i)=>`hsl(${280+i*14},60%,${62-i*3}%)`),
+        borderRadius:5,borderSkipped:false}]},
+      options:{
+        indexAxis:"y", animation:{duration:700},
+        scales:{
+          x:{grid:{color:"#1a1a1e"},ticks:{color:"#606070",precision:0}},
+          y:{grid:{display:false},ticks:{color:"#9090a0"}}
+        },
+        plugins:{legend:{display:false}}
+      }
+    })
+
+    // Top actors
     mkChart("cActors",{
       type:"bar",
-      data:{
-        labels:topActors.map(a=>a.name),
-        datasets:[{data:topActors.map(a=>a.count),
-          backgroundColor:topActors.map((_,i)=>`hsl(${42+i*3},90%,${58-i*2}%)`),
-          borderRadius:4,borderSkipped:false}]
-      },
+      data:{labels:topActors.map(a=>a.name),datasets:[{data:topActors.map(a=>a.count),
+        backgroundColor:topActors.map((_,i)=>`hsl(${42+i*3},90%,${58-i*2}%)`),
+        borderRadius:4,borderSkipped:false}]},
       options:{
         indexAxis:"y", animation:{duration:700},
         scales:{
@@ -366,19 +469,17 @@ function renderDashboard(){
       }
     })
 
+    // Directors spread
     mkChart("cDirs",{
       type:"bar",
-      data:{
-        labels:Object.keys(dBuckets),
-        datasets:[{data:Object.values(dBuckets),
-          backgroundColor:["#2a2a30","#3b82f6","#F5C518","#ef4444","#7f1d1d"],
-          borderRadius:4,borderSkipped:false}]
-      },
+      data:{labels:Object.keys(dBuckets),datasets:[{data:Object.values(dBuckets),
+        backgroundColor:["#2a2a30","#3b82f6","#F5C518","#ef4444","#7f1d1d"],
+        borderRadius:4,borderSkipped:false}]},
       options:{
         animation:{duration:700},
         scales:{
           x:{grid:{display:false},ticks:{color:"#9090a0"}},
-          y:{grid:{color:"#1a1a1e"},ticks:{color:"#606070"}}
+          y:{grid:{color:"#1a1a1e"},ticks:{color:"#606070",precision:0}}
         },
         plugins:{legend:{display:false},tooltip:{callbacks:{title:ctx=>`Missing: ${ctx[0].label} films`}}}
       }
