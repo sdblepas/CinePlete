@@ -13,6 +13,8 @@
 ![Plex](https://img.shields.io/badge/Plex-compatible-orange)
 ![Jellyfin](https://img.shields.io/badge/Jellyfin-compatible-7B2FBE)
 ![Radarr](https://img.shields.io/badge/Radarr-integration-purple)
+![Overseerr](https://img.shields.io/badge/Overseerr-integration-F59E0B)
+![Jellyseerr](https://img.shields.io/badge/Jellyseerr-integration-29B4E8)
 ![TMDB](https://img.shields.io/badge/TMDB-API-blue)
 ![Homelab](https://img.shields.io/badge/homelab-friendly-blue)
 ![GitHub Stars](https://img.shields.io/github/stars/sdblepas/CinePlete?style=social)
