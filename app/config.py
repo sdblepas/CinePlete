@@ -16,6 +16,8 @@ DEFAULT_CONFIG = {
         "JELLYFIN_URL": "",
         "JELLYFIN_API_KEY": "",
         "JELLYFIN_LIBRARY_NAME": "Movies",
+        "JELLYFIN_PAGE_SIZE": 500,
+        "SHORT_MOVIE_LIMIT": 60,
     },
     "PLEX": {
         "PLEX_URL": "",

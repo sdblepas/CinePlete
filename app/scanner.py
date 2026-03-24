@@ -39,8 +39,8 @@ STEPS = [
     "Validating TMDB metadata",
     "Analyzing collections",
     "Analyzing directors",
-    "Analyzing actors",
     "Building suggestions",
+    "Analyzing actors",
     "Building results",
 ]
 
@@ -298,7 +298,7 @@ def build():
     classics = sorted(classics, key=lambda x: (-x["rating"], -x["votes"]))
 
     # ---- SUGGESTIONS (based on your library) ------------------
-    _set_step(6, f"{len(plex_ids)} library films")
+    _set_step(5, f"{len(plex_ids)} library films")
 
     # Score map: {tmdb_id: recommendation_count}
     rec_scores: dict = {}
@@ -368,7 +368,7 @@ def build():
     log.info(f"Suggestions built: {len(suggestions)}")
 
     # ---- ACTORS -----------------------------------------------
-    _set_step(5, f"{len(actors_map)} actors")
+    _set_step(6, f"{len(actors_map)} actors")
     actors = []
     actor_missing_total = 0
 

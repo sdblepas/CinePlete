@@ -23,9 +23,15 @@ def _jf_get(path: str, params: dict = None) -> dict:
     headers = {"X-Emby-Token": jf["JELLYFIN_API_KEY"]}
     url     = jf["JELLYFIN_URL"].rstrip("/") + path
 
-    r = requests.get(url, headers=headers, params=params or {}, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    try:
+        r = requests.get(url, headers=headers, params=params or {}, timeout=30)
+        r.raise_for_status()
+        return r.json()
+    except requests.exceptions.ConnectionError as exc:
+        raise RuntimeError(
+            f"Cannot connect to Jellyfin at {jf['JELLYFIN_URL']} — "
+            "check JELLYFIN_URL in config and that Jellyfin is reachable"
+        ) from exc
 
 
 def _library_id(library_name: str) -> str:
@@ -51,8 +57,8 @@ def scan_movies():
     cfg    = load_config()
     jf_cfg = cfg["JELLYFIN"]
 
-    short_movie_limit = int(cfg.get("PLEX", {}).get("SHORT_MOVIE_LIMIT", 60))
-    page_size         = int(cfg.get("PLEX", {}).get("PLEX_PAGE_SIZE", 500))
+    short_movie_limit = int(jf_cfg.get("SHORT_MOVIE_LIMIT", 60))
+    page_size         = int(jf_cfg.get("JELLYFIN_PAGE_SIZE", 500))
     library_name      = jf_cfg.get("JELLYFIN_LIBRARY_NAME", "Movies")
 
     library_id = _library_id(library_name)
