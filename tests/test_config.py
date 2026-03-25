@@ -149,3 +149,16 @@ class TestDefaultConfigSections:
         assert "AUTOMATION"  in result
         assert "TELEGRAM"    in result
         assert "SUGGESTIONS" in result
+        assert "AUTH"        in result
+
+    def test_auth_section_exists(self):
+        assert "AUTH" in DEFAULT_CONFIG
+
+    def test_auth_method_default_none(self):
+        assert DEFAULT_CONFIG["AUTH"]["AUTH_METHOD"] == "None"
+
+    def test_auth_credentials_default_empty(self):
+        assert DEFAULT_CONFIG["AUTH"]["AUTH_USERNAME"]      == ""
+        assert DEFAULT_CONFIG["AUTH"]["AUTH_PASSWORD_HASH"] == ""
+        assert DEFAULT_CONFIG["AUTH"]["AUTH_PASSWORD_SALT"] == ""
+        assert DEFAULT_CONFIG["AUTH"]["AUTH_SECRET_KEY"]    == ""
