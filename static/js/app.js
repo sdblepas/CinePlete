@@ -334,8 +334,22 @@ async function boot(){
     }
   } catch(e) {}
 
+  // Show logout button only when auth is active (not in "None" mode)
+  try {
+    const auth = await api("/api/auth/status")
+    if (auth.method !== "None") {
+      const btn = document.getElementById("logoutBtn")
+      if (btn) btn.style.display = "block"
+    }
+  } catch(e) {}
+
   if (CONFIGURED) await loadResults()
   else { setStatus("Setup required"); render() }
+}
+
+async function logout() {
+  await fetch("/api/auth/logout", { method: "POST" })
+  window.location.href = "/login"
 }
 
 document.getElementById("scanBtn").addEventListener("click", rescan)

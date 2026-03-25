@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Cineplete · Login</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F5C518'/><rect x='15' y='25' width='70' height='50' rx='6' fill='%23000'/><line x1='35' y1='25' x2='35' y2='75' stroke='%23F5C518' stroke-width='6'/><line x1='65' y1='25' x2='65' y2='75' stroke='%23F5C518' stroke-width='6'/><line x1='15' y1='50' x2='85' y2='50' stroke='%23F5C518' stroke-width='6'/></svg>"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --gold:    #F5C518;
+      --bg:      #0e0e10;
+      --bg2:     #141416;
+      --bg3:     #1a1a1e;
+      --border:  #2a2a30;
+      --border2: #323238;
+      --text:    #e8e8f0;
+      --text2:   #9090a0;
+      --text3:   #606070;
+      --red:     #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    body::before {
+      content: "";
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: .4;
+    }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.5);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 1.8rem;
+    }
+
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px; height: 48px;
+      background: var(--gold);
+      border-radius: 12px;
+      margin-bottom: .6rem;
+    }
+
+    .logo-mark svg { width: 26px; height: 26px; }
+
+    .logo-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: var(--text);
+      display: block;
+    }
+
+    .logo-sub {
+      font-size: .65rem;
+      color: var(--text3);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    label {
+      display: block;
+      font-size: .7rem;
+      color: var(--text2);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: .4rem;
+      margin-top: 1rem;
+    }
+
+    label:first-of-type { margin-top: 0; }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: .85rem;
+      padding: .55rem .75rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    input:focus { border-color: var(--gold); }
+
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-top: 1rem;
+      font-size: .75rem;
+      color: var(--text2);
+      cursor: pointer;
+    }
+
+    .remember input { width: auto; }
+
+    .btn {
+      width: 100%;
+      margin-top: 1.4rem;
+      padding: .65rem;
+      background: var(--gold);
+      color: #000;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: .85rem;
+      letter-spacing: .04em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+
+    .btn:hover   { opacity: .9; }
+    .btn:active  { transform: scale(.98); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    #error {
+      display: none;
+      margin-top: .9rem;
+      padding: .5rem .75rem;
+      background: rgba(239,68,68,.08);
+      border: 1px solid rgba(239,68,68,.25);
+      border-radius: 6px;
+      color: var(--red);
+      font-size: .75rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100" height="100" rx="20" fill="#000"/>
+          <rect x="15" y="25" width="70" height="50" rx="6" fill="#F5C518"/>
+          <line x1="35" y1="25" x2="35" y2="75" stroke="#000" stroke-width="6"/>
+          <line x1="65" y1="25" x2="65" y2="75" stroke="#000" stroke-width="6"/>
+          <line x1="15" y1="50" x2="85" y2="50" stroke="#000" stroke-width="6"/>
+        </svg>
+      </div>
+      <span class="logo-title">CinePlete</span>
+      <span class="logo-sub">Sign in to continue</span>
+    </div>
+
+    <label for="username">Username</label>
+    <input id="username" type="text" autocomplete="username" autofocus/>
+
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password"/>
+
+    <label class="remember">
+      <input id="remember" type="checkbox"/>
+      Trust this browser for 30 days
+    </label>
+
+    <button class="btn" id="loginBtn" onclick="doLogin()">Sign in</button>
+    <div id="error"></div>
+  </div>
+
+  <script>
+    // Auto-submit on Enter key
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter") doLogin()
+    })
+
+    async function doLogin() {
+      const username    = document.getElementById("username").value.trim()
+      const password    = document.getElementById("password").value
+      const remember_me = document.getElementById("remember").checked
+      const btn         = document.getElementById("loginBtn")
+      const err         = document.getElementById("error")
+
+      if (!username || !password) {
+        showError("Please enter username and password")
+        return
+      }
+
+      btn.disabled   = true
+      btn.textContent = "Signing in…"
+      err.style.display = "none"
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password, remember_me }),
+        })
+        const data = await res.json()
+
+        if (data.ok) {
+          const params  = new URLSearchParams(window.location.search)
+          const nextUrl = params.get("next") || "/"
+          window.location.href = nextUrl.startsWith("/") ? nextUrl : "/"
+        } else {
+          showError(data.error || "Login failed")
+          btn.disabled    = false
+          btn.textContent = "Sign in"
+        }
+      } catch(e) {
+        showError("Network error — is the server running?")
+        btn.disabled    = false
+        btn.textContent = "Sign in"
+      }
+    }
+
+    function showError(msg) {
+      const err = document.getElementById("error")
+      err.textContent   = msg
+      err.style.display = "block"
+    }
+  </script>
+</body>
+</html>

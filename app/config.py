@@ -82,6 +82,14 @@ DEFAULT_CONFIG = {
         "WATCHTOWER_URL": "",
         "WATCHTOWER_API_TOKEN": "",
     },
+    "AUTH": {
+        # "None" | "Forms" | "DisabledForLocalAddresses"
+        "AUTH_METHOD": "None",
+        "AUTH_USERNAME": "",
+        "AUTH_PASSWORD_HASH": "",
+        "AUTH_PASSWORD_SALT": "",
+        "AUTH_SECRET_KEY": "",   # auto-generated on first save
+    },
 }
 
 

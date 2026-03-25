@@ -102,6 +102,7 @@ function renderConfig(){
   const jss   = cfg.JELLYSEERR  ||{}
   const wh    = cfg.WEBHOOK     ||{}
   const wtch  = cfg.WATCHTOWER  ||{}
+  const auth  = cfg.AUTH        ||{}
 
   const mediaServer = (srv.MEDIA_SERVER || "plex").toLowerCase()
 
@@ -147,6 +148,26 @@ function renderConfig(){
 
     <!-- LEFT COLUMN -->
     <div>
+      <div class="form-section">
+        ${sec('Authentication <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
+        <div class="form-group">
+          <label class="form-label">Auth Mode</label>
+          <select id="cfg_auth_method"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);
+                   border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;
+                   font-size:.82rem;padding:.45rem .6rem;outline:none">
+            <option value="None"                     ${(auth.AUTH_METHOD||"None")==="None"?"selected":""}>None — open access</option>
+            <option value="DisabledForLocalAddresses" ${auth.AUTH_METHOD==="DisabledForLocalAddresses"?"selected":""}>Local network free, login from internet</option>
+            <option value="Forms"                     ${auth.AUTH_METHOD==="Forms"?"selected":""}>Always require login</option>
+          </select>
+        </div>
+        ${field("cfg_auth_username", "Username", auth.AUTH_USERNAME||"")}
+        ${field("cfg_auth_password", "New Password", "", "secret")}
+        ${auth.AUTH_HAS_PASSWORD
+          ? hint("Password is set. Leave blank to keep current password.")
+          : hint("No password set yet. Enter one to enable login.")}
+      </div>
+
       <div class="form-section">
         ${sec("Media Server")}
         <div class="form-group">
@@ -359,6 +380,11 @@ async function saveConfig(){
     },
     AUTOMATION:{
       LIBRARY_POLL_INTERVAL: vi("cfg_poll_interval"),
+    },
+    AUTH:{
+      AUTH_METHOD:   v("cfg_auth_method"),
+      AUTH_USERNAME: v("cfg_auth_username"),
+      AUTH_PASSWORD: v("cfg_auth_password"),  // virtual — backend hashes and stores
     },
   }
 

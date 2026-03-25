@@ -1,18 +1,25 @@
+import copy
 import os
 from datetime import datetime
 import json
 import requests
 from urllib.parse import urlparse
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Body, Query, Header
+from fastapi import FastAPI, Body, Query, Header, Request, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse, RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import load_config, save_config, is_configured
 from app.scanner import build, build_async, scan_state
 from app.overrides import load_json, save_json, add_unique, remove_value
 from app.logger import get_logger
 from app import scheduler
+from app.auth import (
+    COOKIE_NAME, get_client_ip, is_local_address,
+    hash_password, verify_password,
+    create_token, verify_token, generate_secret_key,
+)
 
 DATA_DIR       = os.getenv("DATA_DIR", "/data")
 RESULTS_FILE   = f"{DATA_DIR}/results.json"
@@ -39,6 +46,47 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# ---------------------------------------------------------------------------
+# Auth middleware
+# ---------------------------------------------------------------------------
+
+_PUBLIC_PATHS    = {"/login", "/api/auth/login", "/api/auth/status", "/api/version"}
+_PUBLIC_PREFIXES = ("/static/",)
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+
+        # Always public
+        if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+            return await call_next(request)
+
+        cfg      = load_config()
+        auth_cfg = cfg.get("AUTH", {})
+        method   = auth_cfg.get("AUTH_METHOD", "None")
+
+        if method == "None":
+            return await call_next(request)
+
+        if method == "DisabledForLocalAddresses":
+            if is_local_address(get_client_ip(request)):
+                return await call_next(request)
+
+        # Validate session cookie
+        token  = request.cookies.get(COOKIE_NAME, "")
+        secret = auth_cfg.get("AUTH_SECRET_KEY", "")
+        if token and secret and verify_token(token, secret):
+            return await call_next(request)
+
+        # Not authenticated
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return RedirectResponse(url=f"/login?next={request.url.path}", status_code=302)
+
+
+app.add_middleware(AuthMiddleware)
 
 
 # --------------------------------------------------
@@ -68,6 +116,78 @@ def index():
     # Inject version into script URLs for automatic browser cache-busting
     # on every new deployment (browsers re-fetch JS when ?v= changes)
     return html.replace("__VERSION__", APP_VERSION)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    with open(f"{STATIC_DIR}/login.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+# --------------------------------------------------
+# Auth API
+# --------------------------------------------------
+
+@app.get("/api/auth/status")
+def api_auth_status(request: Request):
+    """Returns current auth mode and whether the current request is authenticated."""
+    cfg      = load_config()
+    auth_cfg = cfg.get("AUTH", {})
+    method   = auth_cfg.get("AUTH_METHOD", "None")
+    has_user = bool(auth_cfg.get("AUTH_USERNAME") and auth_cfg.get("AUTH_PASSWORD_HASH"))
+
+    authed = False
+    if method == "None":
+        authed = True
+    elif method == "DisabledForLocalAddresses" and is_local_address(get_client_ip(request)):
+        authed = True
+    else:
+        token  = request.cookies.get(COOKIE_NAME, "")
+        secret = auth_cfg.get("AUTH_SECRET_KEY", "")
+        authed = bool(token and secret and verify_token(token, secret))
+
+    return {"method": method, "authenticated": authed, "has_user": has_user}
+
+
+@app.post("/api/auth/login")
+async def api_auth_login(request: Request, response: Response):
+    body        = await request.json()
+    username    = str(body.get("username", "")).strip()
+    password    = str(body.get("password", ""))
+    remember_me = bool(body.get("remember_me", False))
+
+    cfg      = load_config()
+    auth_cfg = cfg.get("AUTH", {})
+
+    stored_user = auth_cfg.get("AUTH_USERNAME", "")
+    stored_hash = auth_cfg.get("AUTH_PASSWORD_HASH", "")
+    stored_salt = auth_cfg.get("AUTH_PASSWORD_SALT", "")
+    secret      = auth_cfg.get("AUTH_SECRET_KEY", "")
+
+    if not stored_user or not stored_hash:
+        return {"ok": False, "error": "No user configured — set credentials in Config first"}
+
+    if not secret:
+        return {"ok": False, "error": "Auth not fully configured (missing secret key)"}
+
+    if username != stored_user or not verify_password(password, stored_hash, stored_salt):
+        log.warning(f"Auth failed for '{username}' from {get_client_ip(request)}")
+        return {"ok": False, "error": "Invalid username or password"}
+
+    token   = create_token(username, remember_me, secret)
+    max_age = 30 * 86_400 if remember_me else 86_400
+    response.set_cookie(
+        COOKIE_NAME, token,
+        max_age=max_age, httponly=True, samesite="lax", path="/",
+    )
+    log.info(f"Auth success for '{username}' from {get_client_ip(request)}")
+    return {"ok": True}
+
+
+@app.post("/api/auth/logout")
+def api_auth_logout(response: Response):
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return {"ok": True}
 
 
 # --------------------------------------------------
@@ -130,7 +250,14 @@ def api_version():
 
 @app.get("/api/config")
 def api_get_config():
-    return load_config()
+    cfg  = copy.deepcopy(load_config())
+    auth = cfg.get("AUTH", {})
+    # Expose whether a password is set without exposing the hash
+    auth["AUTH_HAS_PASSWORD"] = bool(auth.get("AUTH_PASSWORD_HASH"))
+    # Never send sensitive fields to the browser
+    for key in ("AUTH_PASSWORD_HASH", "AUTH_PASSWORD_SALT", "AUTH_SECRET_KEY"):
+        auth.pop(key, None)
+    return cfg
 
 
 @app.get("/api/config/status")
@@ -141,6 +268,28 @@ def api_config_status():
 
 @app.post("/api/config")
 def api_save_config(payload: dict = Body(...)):
+    auth_payload = payload.get("AUTH", {})
+    new_password = str(auth_payload.pop("AUTH_PASSWORD", "")).strip()
+    # Virtual field sent by UI — never stored directly
+    auth_payload.pop("AUTH_HAS_PASSWORD", None)
+
+    existing_auth = load_config().get("AUTH", {})
+
+    if new_password:
+        pw_hash, pw_salt = hash_password(new_password)
+        auth_payload["AUTH_PASSWORD_HASH"] = pw_hash
+        auth_payload["AUTH_PASSWORD_SALT"] = pw_salt
+    else:
+        # Preserve existing hash if no new password supplied
+        auth_payload["AUTH_PASSWORD_HASH"] = existing_auth.get("AUTH_PASSWORD_HASH", "")
+        auth_payload["AUTH_PASSWORD_SALT"] = existing_auth.get("AUTH_PASSWORD_SALT", "")
+
+    # Auto-generate secret key once and keep it stable
+    auth_payload["AUTH_SECRET_KEY"] = (
+        existing_auth.get("AUTH_SECRET_KEY") or generate_secret_key()
+    )
+
+    payload["AUTH"] = auth_payload
     cfg = save_config(payload)
     scheduler.restart()
     return {"ok": True, "configured": is_configured(cfg)}
