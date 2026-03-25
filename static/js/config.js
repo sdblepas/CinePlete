@@ -203,9 +203,35 @@ function renderConfig(){
           ${field("cfg_short_limit",  "Short movie limit (min)", plex.SHORT_MOVIE_LIMIT??60,  "number")}
         </div>
       </details>
+
+      <div class="form-section">
+        ${sec('Telegram <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
+        ${check("cfg_tg_enabled", "Enabled", tg.TELEGRAM_ENABLED)}
+        ${field("cfg_tg_token",   "Bot Token",  tg.TELEGRAM_BOT_TOKEN||"", "secret")}
+        ${field("cfg_tg_chat",    "Chat ID",    tg.TELEGRAM_CHAT_ID  ||"")}
+        ${field("cfg_tg_interval","Min interval between notifications (min)", tg.TELEGRAM_MIN_INTERVAL??30,"number")}
+        ${hint("Get your Bot Token from @BotFather and Chat ID from @userinfobot.")}
+      </div>
+
+      <div class="form-section">
+        ${sec("Automation")}
+        ${field("cfg_poll_interval","Library poll interval (min, 0 = disabled)", auto.LIBRARY_POLL_INTERVAL??30,"number")}
+        ${hint("Auto-scans when your media server library size changes.")}
+      </div>
+
+      <div class="form-section" id="cache-section">
+        ${sec("TMDB Cache")}
+        <div id="cache-info" style="font-size:.75rem;color:var(--text3);margin-bottom:.75rem">Loading…</div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;border-color:rgba(34,197,94,.3);color:var(--green)" onclick="backupCache()">💾 Backup</button>
+          <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;border-color:rgba(59,130,246,.3);color:var(--blue)" onclick="restoreCache()">↩ Restore</button>
+          <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px" onclick="clearCache()">🗑 Clear</button>
+        </div>
+      </div>
+
     </div>
 
-    <!-- RIGHT COLUMN -->
+    <!-- RIGHT COLUMN — Integrations -->
     <div>
       <div class="form-section">
         ${sec('Radarr <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
@@ -249,31 +275,6 @@ function renderConfig(){
         <button class="btn-sm" style="margin-top:.5rem;font-size:.72rem;padding:5px 14px;border-color:rgba(59,130,246,.3);color:var(--blue)"
           onclick="triggerWatchtowerUpdate()">⬆ Update Now</button>
         <span id="wtchStatus" style="font-size:.72rem;color:var(--text3);margin-left:.5rem"></span>
-      </div>
-
-      <div class="form-section">
-        ${sec('Telegram <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
-        ${check("cfg_tg_enabled", "Enabled", tg.TELEGRAM_ENABLED)}
-        ${field("cfg_tg_token",   "Bot Token",  tg.TELEGRAM_BOT_TOKEN||"", "secret")}
-        ${field("cfg_tg_chat",    "Chat ID",    tg.TELEGRAM_CHAT_ID  ||"")}
-        ${field("cfg_tg_interval","Min interval between notifications (min)", tg.TELEGRAM_MIN_INTERVAL??30,"number")}
-        ${hint("Get your Bot Token from @BotFather and Chat ID from @userinfobot.")}
-      </div>
-
-      <div class="form-section">
-        ${sec("Automation")}
-        ${field("cfg_poll_interval","Library poll interval (min, 0 = disabled)", auto.LIBRARY_POLL_INTERVAL??30,"number")}
-        ${hint("Auto-scans when your media server library size changes.")}
-      </div>
-
-      <div class="form-section" id="cache-section">
-        ${sec("TMDB Cache")}
-        <div id="cache-info" style="font-size:.75rem;color:var(--text3);margin-bottom:.75rem">Loading…</div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;border-color:rgba(34,197,94,.3);color:var(--green)" onclick="backupCache()">💾 Backup</button>
-          <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;border-color:rgba(59,130,246,.3);color:var(--blue)" onclick="restoreCache()">↩ Restore</button>
-          <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px" onclick="clearCache()">🗑 Clear</button>
-        </div>
       </div>
 
       <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
