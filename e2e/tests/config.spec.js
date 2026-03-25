@@ -23,8 +23,8 @@ test.describe('Settings page', () => {
     await expect(page.locator('#cfg_media_server')).toBeVisible()
   })
 
-  test('Save Settings button is present and enabled', async ({ page }) => {
-    const saveBtn = page.locator('button', { hasText: /save settings/i })
+  test('Save Configuration button is present and enabled', async ({ page }) => {
+    const saveBtn = page.locator('button', { hasText: /save configuration/i })
     await expect(saveBtn).toBeVisible()
     await expect(saveBtn).toBeEnabled()
   })
@@ -73,18 +73,16 @@ test.describe('Movie modal', () => {
     await expect(modal).not.toHaveClass(/open/)
   })
 
-  test('modal closes with ✕ button', async ({ page }) => {
+  test('modal opens and closes via DOM manipulation', async ({ page }) => {
     await page.goto('/')
-    // Programmatically open the modal with a stub movie
+    // Add the open class directly — avoids triggering real TMDB API calls
     await page.evaluate(() => {
-      // @ts-ignore
-      window.openMovieModal && window.openMovieModal(550) // Fight Club TMDB ID
+      document.getElementById('movieModal')?.classList.add('open')
     })
-    // Close it
-    const closeBtn = page.locator('#movieModalClose')
-    if (await closeBtn.isVisible()) {
-      await closeBtn.click()
-      await expect(page.locator('#movieModal')).not.toHaveClass(/open/)
-    }
+    await expect(page.locator('#movieModal')).toHaveClass(/open/)
+
+    // Close via the ✕ button
+    await page.locator('#movieModalClose').click()
+    await expect(page.locator('#movieModal')).not.toHaveClass(/open/)
   })
 })

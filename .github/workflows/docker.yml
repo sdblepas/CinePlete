@@ -122,13 +122,28 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: e2e/package.json
+          cache-dependency-path: e2e/package-lock.json
 
-      - name: Install Playwright + deps
+      - name: Install npm deps
         working-directory: e2e
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('e2e/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps only (cache hit)
+        working-directory: e2e
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Run Playwright tests
         working-directory: e2e
