@@ -254,6 +254,26 @@ CinePlete checks the [GitHub Releases](https://github.com/sdblepas/CinePlete/rel
 
 ---
 
+### Smart Authentication
+
+CinePlete supports Radarr-style authentication, configurable from **Config → Authentication**.
+
+| Mode | Behaviour |
+|------|-----------|
+| **None** | Open access — no login required (default) |
+| **Forms** | Username + password required for all access |
+| **Local network free** | No auth on local IPs (`10.x`, `192.168.x`, `127.x`), login required from internet |
+
+- Passwords hashed with **PBKDF2-SHA256** — never stored in plain text
+- **7-day sliding session cookie** — stay logged in across browser sessions
+- **"Trust this browser"** toggle — persistent vs session cookie
+- API key auth via `X-Api-Key` header or `?access_token=` query param (for integrations)
+- Logout button in the sidebar footer
+
+> Auth defaults to **None** — existing deployments are unaffected until you configure it.
+
+---
+
 ### Auto-Update via Watchtower
 
 CinePlete can automatically update itself using [Watchtower](https://containrrr.dev/watchtower/).
@@ -463,6 +483,9 @@ All persistent data lives in the mounted `/data` volume and survives container u
 | POST | `/api/jellyfin/test` | Tests Jellyfin connectivity and library access |
 | GET | `/api/logs` | Returns last N lines of cineplete.log |
 | POST | `/api/watchtower/update` | Triggers Watchtower to pull latest CinePlete image |
+| GET | `/api/auth/status` | Returns current auth mode and login state |
+| POST | `/api/auth/login` | Authenticates with username + password |
+| POST | `/api/auth/logout` | Clears the session cookie |
 
 ---
 
@@ -677,6 +700,24 @@ Un onglet **Logs** dédié affiche les 200 dernières lignes de `/data/cineplete
 ### Notifications de version
 
 CinePlete vérifie l'[API GitHub Releases](https://github.com/sdblepas/CinePlete/releases) toutes les heures. Lorsqu'une nouvelle version est disponible, une bannière apparaît dans la barre latérale avec un lien vers les notes de version.
+
+---
+
+### Authentification intelligente
+
+CinePlete propose une authentification de type Radarr, configurable depuis **Config → Authentication**.
+
+| Mode | Comportement |
+|------|-------------|
+| **None** | Accès libre — aucun login requis (défaut) |
+| **Forms** | Identifiant + mot de passe requis pour tous |
+| **Local network free** | Pas d'auth sur les IPs locales (`10.x`, `192.168.x`, `127.x`), login requis depuis internet |
+
+- Mots de passe hashés avec **PBKDF2-SHA256**
+- **Cookie glissant 7 jours** — session persistante entre les navigations
+- Toggle **"Faire confiance à ce navigateur"** — cookie persistant ou de session
+- Auth par clé API via header `X-Api-Key` ou `?access_token=`
+- Bouton de déconnexion dans le pied de la barre latérale
 
 ---
 
