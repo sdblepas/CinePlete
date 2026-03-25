@@ -406,12 +406,20 @@ def api_watchtower_update():
         return {"ok": False, "error": "Invalid Watchtower URL scheme"}
 
     headers = {"Authorization": f"Bearer {token}"} if token else {}
-    try:
-        r = requests.post(f"{url}/v1/update", headers=headers, timeout=15)
-        log.info(f"Watchtower update triggered: HTTP {r.status_code}")
-        return {"ok": r.ok, "status": r.status_code, "body": r.text[:200]}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+
+    # Fire-and-forget: Watchtower pulls + restarts the container (kills this process too),
+    # so we dispatch in a background thread and return immediately.
+    def _fire():
+        try:
+            r = requests.post(f"{url}/v1/update", headers=headers, timeout=300)
+            log.info(f"Watchtower update response: HTTP {r.status_code}")
+        except Exception as e:
+            log.warning(f"Watchtower update error: {e}")
+
+    import threading
+    threading.Thread(target=_fire, daemon=True).start()
+    log.info("Watchtower update dispatched (fire-and-forget)")
+    return {"ok": True, "message": "Update request sent — container will restart shortly"}
 
 
 # --------------------------------------------------
