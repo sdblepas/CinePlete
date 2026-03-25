@@ -16,6 +16,7 @@
 ![Radarr](https://img.shields.io/badge/Radarr-integration-purple)
 ![Overseerr](https://img.shields.io/badge/Overseerr-integration-F59E0B)
 ![Jellyseerr](https://img.shields.io/badge/Jellyseerr-integration-29B4E8)
+![Watchtower](https://img.shields.io/badge/Watchtower-auto--update-2496ED)
 ![TMDB](https://img.shields.io/badge/TMDB-API-blue)
 ![Homelab](https://img.shields.io/badge/homelab-friendly-blue)
 ![GitHub Stars](https://img.shields.io/github/stars/sdblepas/CinePlete?style=social)
@@ -247,6 +248,43 @@ The log file rotates automatically (2 MB × 3 files) and never fills your disk.
 
 ---
 
+### Version Notifications
+
+CinePlete checks the [GitHub Releases](https://github.com/sdblepas/CinePlete/releases) API once per hour. When a new version is available, a banner appears in the sidebar below the current version with a direct link to the release notes.
+
+---
+
+### Auto-Update via Watchtower
+
+CinePlete can automatically update itself using [Watchtower](https://containrrr.dev/watchtower/).
+
+Configure it from the **Config → Watchtower** section:
+- Toggle **Auto-update enabled**
+- Set the **Watchtower URL** (e.g. `http://10.0.0.1:8081`)
+- Set the **API Token** (matches `WATCHTOWER_HTTP_API_TOKEN` on your Watchtower container)
+- Click **Update Now** to trigger an immediate pull & restart
+
+Watchtower docker-compose example:
+```yaml
+watchtower:
+  image: containrrr/watchtower
+  environment:
+    - WATCHTOWER_HTTP_API_UPDATE=true
+    - WATCHTOWER_HTTP_API_TOKEN=your_token_here
+    - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true  # enable scheduled + on-demand
+    - WATCHTOWER_POLL_INTERVAL=86400           # 24h auto-check
+    - WATCHTOWER_CLEANUP=true
+  ports:
+    - "8081:8080"
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  restart: unless-stopped
+```
+
+> The `?scope=cineplete` parameter ensures only CinePlete is updated. Add `com.centurylinklabs.watchtower.scope=cineplete` to your CinePlete container labels (already included in the docker-compose example above).
+
+---
+
 ### Radarr Integration
 
 Movies can be added to Radarr with one click from any movie card.
@@ -323,6 +361,7 @@ services:
       net.unraid.docker.webui: "http://[IP]:[PORT:8787]"
       net.unraid.docker.icon: "https://raw.githubusercontent.com/sdblepas/CinePlete/main/assets/icon.png"
       org.opencontainers.image.url: "http://localhost:8787"
+      com.centurylinklabs.watchtower.scope: "cineplete"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8787')"]
       interval: 30s
@@ -423,6 +462,7 @@ All persistent data lives in the mounted `/data` volume and survives container u
 | POST | `/api/radarr/add` | Sends a movie to Radarr |
 | POST | `/api/jellyfin/test` | Tests Jellyfin connectivity and library access |
 | GET | `/api/logs` | Returns last N lines of cineplete.log |
+| POST | `/api/watchtower/update` | Triggers Watchtower to pull latest CinePlete image |
 
 ---
 
@@ -631,6 +671,24 @@ Un seul scan peut tourner à la fois.
 ### Logs
 
 Un onglet **Logs** dédié affiche les 200 dernières lignes de `/data/cineplete.log` avec niveaux de sévérité colorés. Utile pour diagnostiquer les erreurs de scan, d'API TMDB ou de connectivité Plex.
+
+---
+
+### Notifications de version
+
+CinePlete vérifie l'[API GitHub Releases](https://github.com/sdblepas/CinePlete/releases) toutes les heures. Lorsqu'une nouvelle version est disponible, une bannière apparaît dans la barre latérale avec un lien vers les notes de version.
+
+---
+
+### Mise à jour automatique via Watchtower
+
+CinePlete peut se mettre à jour automatiquement via [Watchtower](https://containrrr.dev/watchtower/).
+
+Configurez-le depuis **Config → Watchtower** :
+- Activez **Auto-update enabled**
+- Renseignez l'**URL Watchtower** (ex. `http://10.0.0.1:8081`)
+- Renseignez le **token API** (correspond à `WATCHTOWER_HTTP_API_TOKEN` sur Watchtower)
+- Cliquez **Update Now** pour déclencher un pull & redémarrage immédiat
 
 ---
 
