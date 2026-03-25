@@ -411,7 +411,7 @@ def api_watchtower_update():
     # so we dispatch in a background thread and return immediately.
     def _fire():
         try:
-            r = requests.post(f"{url}/v1/update", headers=headers, timeout=300)
+            r = requests.post(f"{url}/v1/update?scope=cineplete", headers=headers, timeout=300)
             log.info(f"Watchtower update response: HTTP {r.status_code}")
         except Exception as e:
             log.warning(f"Watchtower update error: {e}")
