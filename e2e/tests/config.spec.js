@@ -9,8 +9,9 @@ test.describe('Settings page', () => {
     await page.waitForSelector('#cfg_tmdb_key', { timeout: 5000 })
   })
 
-  test('page title shows Settings', async ({ page }) => {
-    await expect(page.locator('#page-title')).toHaveText('Settings')
+  test('page title shows Configuration', async ({ page }) => {
+    // PAGE_TITLES.config = "Configuration" in app.js
+    await expect(page.locator('#page-title')).toHaveText('Configuration')
   })
 
   test('TMDB API Key field is present and masked', async ({ page }) => {
