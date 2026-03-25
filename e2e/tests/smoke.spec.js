@@ -26,8 +26,15 @@ test.describe('App smoke tests', () => {
     await expect(page.locator('#page-title')).toHaveText('Dashboard')
   })
 
-  test('API health endpoint responds', async ({ request }) => {
-    const res = await request.get('/api/status')
+  test('API version endpoint responds', async ({ request }) => {
+    const res = await request.get('/api/version')
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(body).toHaveProperty('version')
+  })
+
+  test('API scan status endpoint responds', async ({ request }) => {
+    const res = await request.get('/api/scan/status')
     expect(res.status()).toBe(200)
     const body = await res.json()
     expect(body).toHaveProperty('running')
