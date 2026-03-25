@@ -809,13 +809,16 @@ function renderDuplicates(){
     </p>
     <div style="display:flex;flex-direction:column;gap:.4rem">
       ${list.map(d=>{
-        const titles  = d.titles || []
-        const allSame = titles.every(t => t === titles[0])
-        const tagCls  = allSame ? "tag-red" : "tag-gold"
-        const tagLbl  = allSame ? "DUPE" : "MULTI"
-        const titleHtml = titles.map(t => escHtml(t)).join(
-          `<span style="color:var(--text3);margin:0 .3rem">·</span>`
-        )
+        const titles     = d.titles || []
+        const hasEdition = titles.some(t => t.edition)
+        const allSame    = new Set(titles.map(t => t.title)).size === 1
+        const isDupe     = !hasEdition && allSame
+        const tagCls     = isDupe ? "tag-red" : "tag-gold"
+        const tagLbl     = isDupe ? "DUPE" : "MULTI"
+        const titleHtml  = titles.map(t => {
+          const lbl = escHtml(t.title) + (t.edition ? ` <span style="color:var(--text3);font-size:.75em">[${escHtml(t.edition)}]</span>` : "")
+          return lbl
+        }).join(`<span style="color:var(--text3);margin:0 .3rem">·</span>`)
         return `
         <div class="meta-item">
           <span class="tag ${tagCls}" style="flex-shrink:0" title="${allSame ? "Same title — likely a true duplicate" : "Different titles — likely different editions"}">${tagLbl}</span>

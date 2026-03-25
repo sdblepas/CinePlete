@@ -47,7 +47,8 @@ def scan_movies():
     key = library_key()
 
     plex_ids = {}          # {tmdb_id: plex_title}  — dict so we keep the title
-    tmdb_id_dupes = {}     # {tmdb_id: [title1, title2, ...]}
+    plex_editions = {}     # {tmdb_id: editionTitle} for first-seen entry
+    tmdb_id_dupes = {}     # {tmdb_id: [{"title":..., "edition":...}, ...]}
     directors = defaultdict(set)
     actors = defaultdict(set)
     no_tmdb_guid = []
@@ -104,13 +105,16 @@ def scan_movies():
                 })
                 continue
 
+            edition = v.attrib.get("editionTitle", "")
+
             # Store title alongside tmdb_id so we can show it if TMDB lookup fails
             if tmdb_id in plex_ids:
                 if tmdb_id not in tmdb_id_dupes:
-                    tmdb_id_dupes[tmdb_id] = [plex_ids[tmdb_id]]
-                tmdb_id_dupes[tmdb_id].append(title)
+                    tmdb_id_dupes[tmdb_id] = [{"title": plex_ids[tmdb_id], "edition": plex_editions.get(tmdb_id, "")}]
+                tmdb_id_dupes[tmdb_id].append({"title": title, "edition": edition})
             else:
                 plex_ids[tmdb_id] = title
+                plex_editions[tmdb_id] = edition
 
             for d in v.findall("Director"):
                 tag = d.attrib.get("tag")
