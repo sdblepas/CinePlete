@@ -11,6 +11,7 @@ services:
     labels:
       net.unraid.docker.webui: "http://[IP]:[PORT:8787]"
       net.unraid.docker.icon: "https://raw.githubusercontent.com/sdblepas/CinePlete/main/assets/icon.png"
+      com.centurylinklabs.watchtower.scope: "cineplete"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8787')"]
       interval: 30s
