@@ -237,7 +237,7 @@ async function addToRadarr(tmdb, title, btn){
     toast(`${title} sent to Radarr`,"success")
   } else {
     btn.textContent = "✗ Error"; btn.disabled = false
-    toast("Radarr error","error")
+    toast(`Radarr: ${res.error||"unknown error"}`,"error")
   }
 }
 
@@ -265,7 +265,7 @@ async function addToOverseerr(tmdb, title, btn){
     toast(`${title} → Overseerr`,"success")
   } else {
     btn.textContent = "✗"; btn.disabled = false
-    toast("Overseerr error","error")
+    toast(`Overseerr: ${res.error||"unknown error"}`,"error")
   }
 }
 
@@ -279,7 +279,7 @@ async function addToJellyseerr(tmdb, title, btn){
     toast(`${title} → Jellyseerr`,"success")
   } else {
     btn.textContent = "✗"; btn.disabled = false
-    toast("Jellyseerr error","error")
+    toast(`Jellyseerr: ${res.error||"unknown error"}`,"error")
   }
 }
 

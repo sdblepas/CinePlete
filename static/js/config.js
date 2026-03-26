@@ -37,7 +37,7 @@ async function fetchRadarrProfiles(instance, selectId) {
     ).join("")
     toast("Quality profiles loaded", "success")
   } catch(e) {
-    toast("Failed to fetch profiles", "error")
+    toast(`Failed to fetch profiles: ${e?.message||"network error"}`, "error")
   } finally {
     btn.disabled = false; btn.textContent = "⟳ Fetch"
   }
@@ -476,7 +476,7 @@ async function saveConfig(){
   } else {
     st.textContent = "✗ Error saving"
     st.style.color = "var(--red)"
-    toast("Error saving config","error")
+    toast(`Error saving config: ${res.error||"unknown error"}`,"error")
   }
 }
 async function triggerWatchtowerUpdate() {
