@@ -12,7 +12,7 @@ function qualityProfileField(id, currentId, instance) {
         style="flex:1;background:var(--bg3);border:1px solid var(--border2);
                border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;
                font-size:.82rem;padding:.45rem .6rem;outline:none">
-        <option value="${currentId||0}">${currentId ? `ID ${currentId}` : "— fetch to load —"}</option>
+        <option value="${currentId||0}">${currentId ? `⚠ ID ${currentId} — click Fetch to verify` : "— click Fetch to load profiles —"}</option>
       </select>
       <button type="button" class="btn-sm" style="white-space:nowrap;font-size:.72rem;padding:5px 12px"
         onclick="fetchRadarrProfiles('${instance}','${id}')">⟳ Fetch</button>
