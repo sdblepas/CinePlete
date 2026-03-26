@@ -465,6 +465,44 @@ def wishlist_remove(payload: dict = Body(...)):
 # Radarr
 # --------------------------------------------------
 
+@app.get("/api/radarr/profiles")
+def radarr_profiles(instance: str = Query(default="primary")):
+    """Fetch quality profiles from a Radarr instance for the config UI dropdown."""
+    cfg = load_config()
+    if instance == "4k":
+        section = cfg.get("RADARR_4K", {})
+        url = str(section.get("RADARR_4K_URL", "")).rstrip("/")
+        key = str(section.get("RADARR_4K_API_KEY", "")).strip()
+    else:
+        section = cfg.get("RADARR", {})
+        url = str(section.get("RADARR_URL", "")).rstrip("/")
+        key = str(section.get("RADARR_API_KEY", "")).strip()
+
+    if not url or not key:
+        return {"ok": False, "error": "URL and API key required"}
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return {"ok": False, "error": "Invalid Radarr URL"}
+
+    try:
+        r = requests.get(
+            f"{url}/api/v3/qualityprofile",
+            headers={"X-Api-Key": key},
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        return {"ok": False, "error": str(e)}
+
+    if r.status_code == 401:
+        return {"ok": False, "error": "Invalid API key"}
+    if r.status_code != 200:
+        return {"ok": False, "error": f"HTTP {r.status_code}"}
+
+    profiles = [{"id": p["id"], "name": p["name"]} for p in r.json()]
+    return {"ok": True, "profiles": profiles}
+
+
 @app.post("/api/radarr/add")
 def radarr_add(payload: dict = Body(...), instance: str = Query(default="primary")):
     tmdb_id = int(payload.get("tmdb"))

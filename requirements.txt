@@ -5,3 +5,4 @@ pyyaml==6.0.2
 apscheduler==3.10.4
 defusedxml==0.7.1
 zipp==3.23.0
+httpx==0.28.1
