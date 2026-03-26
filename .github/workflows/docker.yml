@@ -64,7 +64,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest pyyaml apscheduler defusedxml requests requests requests requests
+          pip install pytest pyyaml apscheduler defusedxml fastapi httpx requests requests requests requests
 
       - name: Run tests
         run: pytest --tb=short -v
