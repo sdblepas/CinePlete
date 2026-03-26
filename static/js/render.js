@@ -129,6 +129,9 @@ function posterCard(m, extraTag = "") {
   const radarrBtn = CONFIG?.RADARR?.RADARR_ENABLED
     ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`
     : ""
+  const radarr4kBtn = CONFIG?.RADARR_4K?.RADARR_4K_ENABLED
+    ? `<button class="btn-sm btn-radarr" style="opacity:.75" onclick="event.stopPropagation();addToRadarr4k(${tmdb},'${safeName}',this)">+ 4K</button>`
+    : ""
   const overseerrBtn = CONFIG?.OVERSEERR?.OVERSEERR_ENABLED
     ? `<button class="btn-sm btn-overseerr" onclick="event.stopPropagation();addToOverseerr(${tmdb},'${safeName}',this)">→ OS</button>`
     : ""
@@ -165,7 +168,7 @@ function posterCard(m, extraTag = "") {
     </div>
     <div class="pc-overlay">
       <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
-      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${overseerrBtn}${jellyseerrBtn}</div>
+      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}</div>
     </div>
   </div>`
 }
@@ -235,6 +238,20 @@ async function addToRadarr(tmdb, title, btn){
   } else {
     btn.textContent = "✗ Error"; btn.disabled = false
     toast("Radarr error","error")
+  }
+}
+
+async function addToRadarr4k(tmdb, title, btn){
+  btn.disabled = true; btn.textContent = "…"
+  const res = await api("/api/radarr/add?instance=4k","POST",{tmdb,title})
+  if (res.ok){
+    btn.textContent = "✓ In 4K"
+    btn.className   = "btn-sm"
+    btn.style.color = "var(--green)"
+    toast(`${title} sent to Radarr 4K`,"success")
+  } else {
+    btn.textContent = "✗"; btn.disabled = false
+    toast("Radarr 4K error","error")
   }
 }
 

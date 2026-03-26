@@ -51,6 +51,7 @@ DEFAULT_CONFIG = {
     },
     "AUTOMATION": {
         "LIBRARY_POLL_INTERVAL": 30,   # minutes between library size checks (0 = disabled)
+        "AUTO_SCAN_SCHEDULE":    "off", # "off" | "daily" | "weekly" — time-based full rescan
     },
     "TELEGRAM": {
         "TELEGRAM_ENABLED": False,
@@ -66,6 +67,15 @@ DEFAULT_CONFIG = {
         "RADARR_QUALITY_PROFILE_ID": 6,
         "RADARR_MONITORED": True,
         "RADARR_SEARCH_ON_ADD": False,
+    },
+    "RADARR_4K": {
+        "RADARR_4K_ENABLED": False,
+        "RADARR_4K_URL": "",
+        "RADARR_4K_API_KEY": "",
+        "RADARR_4K_ROOT_FOLDER_PATH": "",
+        "RADARR_4K_QUALITY_PROFILE_ID": 6,
+        "RADARR_4K_MONITORED": True,
+        "RADARR_4K_SEARCH_ON_ADD": False,
     },
     "OVERSEERR": {
         "OVERSEERR_ENABLED": False,

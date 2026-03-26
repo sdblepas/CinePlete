@@ -137,6 +137,18 @@ def _get_last_scan_count() -> int | None:
         return None
 
 
+def _scheduled_scan():
+    """Called by APScheduler for time-based auto-scans (daily/weekly)."""
+    from app.scanner import build_async, scan_state
+    if scan_state["running"]:
+        log.debug("Scheduled scan skipped — scan already running")
+        return
+    log.info("Scheduled auto-scan triggered")
+    launched = build_async()
+    if not launched:
+        log.warning("Scheduled auto-scan could not start (lock busy)")
+
+
 def _poll():
     """Called by APScheduler. Triggers a scan if library size changed."""
     # Import here to avoid circular import
@@ -175,24 +187,49 @@ def start(interval_minutes: int):
     """Start the background scheduler with the given poll interval."""
     global _scheduler
 
-    if interval_minutes <= 0:
-        log.info("Library polling disabled (LIBRARY_POLL_INTERVAL = 0)")
+    cfg      = load_config()
+    schedule = cfg.get("AUTOMATION", {}).get("AUTO_SCAN_SCHEDULE", "off")
+
+    if interval_minutes <= 0 and schedule == "off":
+        log.info("Library polling and scheduled auto-scan both disabled")
         return
 
     if _scheduler and _scheduler.running:
         _scheduler.shutdown(wait=False)
 
     _scheduler = BackgroundScheduler(daemon=True)
-    _scheduler.add_job(
-        _poll,
-        trigger="interval",
-        minutes=interval_minutes,
-        id="library_poll",
-        replace_existing=True,
-    )
+
+    if interval_minutes > 0:
+        _scheduler.add_job(
+            _poll,
+            trigger="interval",
+            minutes=interval_minutes,
+            id="library_poll",
+            replace_existing=True,
+        )
+        media_server = cfg.get("SERVER", {}).get("MEDIA_SERVER", "plex").lower()
+        log.info(f"Library polling started — watching {media_server} every {interval_minutes} minute(s)")
+
+    if schedule == "daily":
+        _scheduler.add_job(
+            _scheduled_scan,
+            trigger="cron",
+            hour=2, minute=0,
+            id="auto_scan",
+            replace_existing=True,
+        )
+        log.info("Scheduled auto-scan: daily at 02:00")
+    elif schedule == "weekly":
+        _scheduler.add_job(
+            _scheduled_scan,
+            trigger="cron",
+            day_of_week="sun", hour=2, minute=0,
+            id="auto_scan",
+            replace_existing=True,
+        )
+        log.info("Scheduled auto-scan: weekly on Sunday at 02:00")
+
     _scheduler.start()
-    media_server = load_config().get("SERVER", {}).get("MEDIA_SERVER", "plex").lower()
-    log.info(f"Library polling started — watching {media_server} every {interval_minutes} minute(s)")
 
 
 def stop():

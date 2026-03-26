@@ -107,6 +107,9 @@ async function openMovieModal(tmdb, fallback = {}) {
   const radarrBtn = CONFIG?.RADARR?.RADARR_ENABLED
     ? `<button class="btn-sm btn-radarr" onclick="addToRadarr(${tmdb},'${safeTitle}',this)">+ Radarr</button>`
     : ""
+  const radarr4kBtn = CONFIG?.RADARR_4K?.RADARR_4K_ENABLED
+    ? `<button class="btn-sm btn-radarr" style="opacity:.75" onclick="addToRadarr4k(${tmdb},'${safeTitle}',this)">+ 4K</button>`
+    : ""
   const overseerrBtn = CONFIG?.OVERSEERR?.OVERSEERR_ENABLED
     ? `<button class="btn-sm btn-overseerr" onclick="addToOverseerr(${tmdb},'${safeTitle}',this)">→ Overseerr</button>`
     : ""
@@ -134,6 +137,7 @@ async function openMovieModal(tmdb, fallback = {}) {
     <div class="modal-actions">
       ${wBtn}
       ${radarrBtn}
+      ${radarr4kBtn}
       ${overseerrBtn}
       ${jellyseerrBtn}
       ${trailerBtn}
