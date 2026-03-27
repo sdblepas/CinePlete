@@ -763,6 +763,57 @@ function renderWishlist(){
 
 /* ── Letterboxd tab ──────────────────────────────────────── */
 
+function _lbUrlManager(savedUrls, moviesRes) {
+  const urlList = savedUrls.length
+    ? savedUrls.map(u => {
+        const safe   = escHtml(u)
+        const safeJs = u.replace(/\\/g,"\\\\").replace(/'/g,"\\'")
+        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--border)">
+          <span style="flex:1;font-size:.75rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;
+                       white-space:nowrap" title="${safe}">${safe}</span>
+          <button onclick="removeLbUrl('${safeJs}',this)"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:.85rem;
+                   padding:2px 6px;flex-shrink:0" title="Remove">✕</button>
+        </div>`
+      }).join("")
+    : `<p style="color:var(--text3);font-size:.75rem;padding:.4rem 0">No lists added yet</p>`
+
+  const stats = moviesRes && moviesRes.movies?.length
+    ? `<span style="color:var(--text3);font-size:.72rem;margin-left:.5rem">${moviesRes.movies.length} movies</span>`
+    : ""
+
+  return `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+                padding:1rem 1.2rem;margin-bottom:1.5rem">
+      <div style="font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+                  color:var(--text3);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
+        Letterboxd Lists${stats}
+      </div>
+      <div style="margin-bottom:.75rem">${urlList}</div>
+      <div style="display:flex;flex-direction:column;gap:.35rem">
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input id="lbUrlInput" type="url"
+            placeholder="e.g. letterboxd.com/you/watchlist/ or /list/my-list/"
+            style="flex:1;min-width:0;padding:6px 10px;border-radius:7px;border:1px solid var(--border2);
+                   background:var(--bg3);color:var(--text);font-size:.78rem;font-family:'DM Mono',monospace"
+            onkeydown="if(event.key==='Enter')addLbUrl(this)"/>
+          <button onclick="addLbUrl(document.getElementById('lbUrlInput'))"
+            style="white-space:nowrap;padding:6px 14px;border-radius:7px;border:1px solid var(--border2);
+                   background:var(--bg3);color:var(--text2);cursor:pointer;font-size:.75rem;
+                   font-family:'DM Mono',monospace;flex-shrink:0">
+            + Add
+          </button>
+        </div>
+        <p style="color:var(--text3);font-size:.7rem;margin:0">
+          Tip: use a watchlist or named list URL — e.g.
+          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/watchlist/</code> or
+          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/list/best-of-2024/</code>.
+          The list must be public.
+        </p>
+      </div>
+    </div>`
+}
+
 async function renderLetterboxd() {
   const c = document.getElementById("content")
   c.innerHTML = `<p style="color:var(--text3);font-size:.78rem">Loading…</p>`
@@ -779,47 +830,26 @@ async function renderLetterboxd() {
   }
 
   const savedUrls = urlsRes.urls || []
-  const movies    = moviesRes.movies || []
+
+  // If server returned an error (e.g. TMDB not configured), show it
+  if (!moviesRes.ok) {
+    const urlManager2 = _lbUrlManager(savedUrls)
+    c.innerHTML = urlManager2 + emptyStateHTML(moviesRes.error || "Failed to load movies")
+    return
+  }
+
+  const movies = moviesRes.movies || []
 
   // ── URL manager ─────────────────────────────────────────
-  const urlList = savedUrls.length
-    ? savedUrls.map(u => {
-        const safe = escHtml(u)
-        const safeJs = u.replace(/\\/g,"\\\\").replace(/'/g,"\\'")
-        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--border)">
-          <span style="flex:1;font-size:.75rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;
-                       white-space:nowrap" title="${safe}">${safe}</span>
-          <button onclick="removeLbUrl('${safeJs}',this)"
-            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:.85rem;
-                   padding:2px 6px;flex-shrink:0" title="Remove">✕</button>
-        </div>`
-      }).join("")
-    : `<p style="color:var(--text3);font-size:.75rem;padding:.4rem 0">No lists added yet</p>`
-
-  const urlManager = `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;
-                padding:1rem 1.2rem;margin-bottom:1.5rem">
-      <div style="font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
-                  color:var(--text3);margin-bottom:.75rem">Letterboxd Lists</div>
-      <div style="margin-bottom:.75rem">${urlList}</div>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <input id="lbUrlInput" type="url" placeholder="Paste a Letterboxd list or watchlist URL…"
-          style="flex:1;min-width:0;padding:6px 10px;border-radius:7px;border:1px solid var(--border2);
-                 background:var(--bg3);color:var(--text);font-size:.78rem;font-family:'DM Mono',monospace"
-          onkeydown="if(event.key==='Enter')addLbUrl(this)"/>
-        <button onclick="addLbUrl(document.getElementById('lbUrlInput'))"
-          style="white-space:nowrap;padding:6px 14px;border-radius:7px;border:1px solid var(--border2);
-                 background:var(--bg3);color:var(--text2);cursor:pointer;font-size:.75rem;
-                 font-family:'DM Mono',monospace;flex-shrink:0">
-          + Add
-        </button>
-      </div>
-    </div>`
+  const urlManager = _lbUrlManager(savedUrls, moviesRes)
 
   if (!movies.length) {
-    c.innerHTML = urlManager + (savedUrls.length
-      ? emptyStateHTML("No movies found — check your lists are public")
-      : emptyStateHTML("Add a Letterboxd list above to get started"))
+    const hint = moviesRes.unique > 0
+      ? `Found ${moviesRes.unique} movie IDs in RSS but TMDB enrichment returned nothing — check your TMDB API key`
+      : savedUrls.length
+        ? "No movies found — make sure the list is public and is a watchlist or named list (not a profile page)"
+        : "Add a Letterboxd list above to get started"
+    c.innerHTML = urlManager + emptyStateHTML(hint)
     return
   }
 

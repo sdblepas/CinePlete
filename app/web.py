@@ -514,23 +514,19 @@ def _fetch_letterboxd_rss(url: str) -> list[dict]:
     Accepts any public Letterboxd URL and derives the RSS endpoint:
       /username/watchlist/      → /username/watchlist/rss/
       /username/list/my-list/   → /username/list/my-list/rss/
-      /username/rss/            → used as-is
-      /username/films/          → /username/rss/  (diary feed, most recent 200)
+      /username/rss/            → used as-is (diary)
+      /username/films/          → /username/films/rss/  (rated-films RSS)
 
-    The RSS feed includes <tmdb:movieId> so no TMDB search is needed.
-    Falls back to <letterboxd:filmTitle> + <letterboxd:filmYear> for entries
-    that predate TMDB linking (rare) — those are resolved via TMDB search.
+    Element matching is done by local-name only (namespace-agnostic) to handle
+    variations in how Letterboxd declares the tmdb/letterboxd namespace URIs.
     """
     import xml.etree.ElementTree as ET
 
     path = urlparse(url).path.rstrip("/")
 
-    # Already an RSS path → use as-is
+    # Already an explicit RSS path → use as-is
     if path.endswith("/rss"):
         rss_url = url.rstrip("/") + "/"
-    # /films page has no dedicated RSS; fall back to the user diary feed
-    elif path.endswith("/films"):
-        rss_url = "https://letterboxd.com/" + path.lstrip("/").split("/")[0] + "/rss/"
     else:
         rss_url = url.rstrip("/") + "/rss/"
 
@@ -538,7 +534,8 @@ def _fetch_letterboxd_rss(url: str) -> list[dict]:
         resp = requests.get(
             rss_url,
             headers={"User-Agent": "Mozilla/5.0 (compatible; CinePlete/1.0)"},
-            timeout=10,
+            timeout=15,
+            allow_redirects=True,
         )
     except requests.exceptions.RequestException:
         return []
@@ -551,32 +548,33 @@ def _fetch_letterboxd_rss(url: str) -> list[dict]:
     except ET.ParseError:
         return []
 
-    ns = {
-        "letterboxd": "https://letterboxd.com",
-        "tmdb":       "https://themoviedb.org/",
-    }
+    # Helper: extract local name from Clark-notation tag "{uri}local" or "local"
+    def local(tag: str) -> str:
+        return tag.split("}")[-1] if "}" in tag else tag
 
     movies = []
     for item in root.findall(".//item"):
-        # Prefer direct TMDB ID
-        tmdb_el = item.find("tmdb:movieId", ns)
-        if tmdb_el is not None and tmdb_el.text:
-            try:
-                movies.append({"tmdb_id": int(tmdb_el.text)})
-                continue
-            except (ValueError, TypeError):
-                pass
-        # Fallback: title + year for TMDB search
-        title_el = item.find("letterboxd:filmTitle", ns)
-        year_el  = item.find("letterboxd:filmYear",  ns)
-        if title_el is not None and title_el.text:
-            year = None
-            if year_el is not None and year_el.text:
+        tmdb_id = title = year = None
+
+        for child in item:
+            lname = local(child.tag)
+            if lname == "movieId" and child.text:
                 try:
-                    year = int(year_el.text)
+                    tmdb_id = int(child.text)
+                except (ValueError, TypeError):
+                    pass
+            elif lname == "filmTitle" and child.text:
+                title = child.text
+            elif lname == "filmYear" and child.text:
+                try:
+                    year = int(child.text)
                 except ValueError:
                     pass
-            movies.append({"title": title_el.text, "year": year})
+
+        if tmdb_id:
+            movies.append({"tmdb_id": tmdb_id})
+        elif title:
+            movies.append({"title": title, "year": year})
 
     return movies
 
@@ -740,7 +738,13 @@ def letterboxd_get_movies():
     # Sort: score desc, then rating desc as tie-breaker
     movies.sort(key=lambda m: (-m["score"], -(m["rating"] or 0)))
 
-    return {"ok": True, "movies": movies, "urls": urls}
+    return {
+        "ok":         True,
+        "movies":     movies,
+        "urls":       urls,
+        "raw_count":  sum(counts.values()),   # total appearances across all lists (debug)
+        "unique":     len(counts),            # unique TMDB IDs found before enrichment
+    }
 
 
 # --------------------------------------------------
