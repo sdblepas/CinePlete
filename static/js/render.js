@@ -763,6 +763,9 @@ function renderWishlist(){
 
 /* ── Letterboxd tab ──────────────────────────────────────── */
 
+let _lbPollTimer   = null   // setInterval handle while refresh is in flight
+let _lbLastFetched = null   // last known fetched_at ISO string
+
 function _lbUrlManager(savedUrls, moviesRes) {
   const urlList = savedUrls.length
     ? savedUrls.map(u => {
@@ -784,6 +787,16 @@ function _lbUrlManager(savedUrls, moviesRes) {
     ? `<span style="color:var(--text3);font-size:.72rem">${count} movies${owned ? ` · ${owned} already owned hidden` : ""}</span>`
     : ""
 
+  const isRefreshing = _lbPollTimer !== null || moviesRes?.refreshing
+  let freshness = ""
+  if (isRefreshing) {
+    freshness = `<span style="color:var(--text3);font-size:.7rem;font-style:italic">↻ Refreshing…</span>`
+  } else if (moviesRes?.fetched_at) {
+    const mins = Math.round((Date.now() - new Date(moviesRes.fetched_at)) / 60000)
+    const label = mins < 1 ? "just now" : `${mins}m ago`
+    freshness = `<span style="color:var(--text3);font-size:.7rem">Updated ${label}</span>`
+  }
+
   return `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;
                 padding:1rem 1.2rem;margin-bottom:1.5rem">
@@ -791,7 +804,8 @@ function _lbUrlManager(savedUrls, moviesRes) {
                   color:var(--text3);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
         Letterboxd Lists
         ${stats}
-        <button onclick="renderLetterboxd()"
+        ${freshness}
+        <button onclick="triggerLbRefresh()"
           style="margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;
                  font-size:.85rem;padding:2px 6px;flex-shrink:0;line-height:1" title="Refresh">↻</button>
       </div>
@@ -824,8 +838,8 @@ function _lbUrlManager(savedUrls, moviesRes) {
 
 async function renderLetterboxd() {
   const c = document.getElementById("content")
-  c.innerHTML = `<p style="color:var(--text3);font-size:.78rem">Loading…</p>`
 
+  // Both calls read local files — fast, no spinner needed
   let urlsRes, moviesRes
   try {
     [urlsRes, moviesRes] = await Promise.all([
@@ -837,12 +851,20 @@ async function renderLetterboxd() {
     return
   }
 
+  // Track fetched_at so the poll can detect when new data arrives
+  if (moviesRes.fetched_at) _lbLastFetched = moviesRes.fetched_at
+
+  // Auto-trigger first-time fetch when URLs exist but no cache yet
+  if (moviesRes.needs_refresh) triggerLbRefresh()
+
+  // Keep poll running if a refresh is still in progress
+  if (moviesRes.refreshing && !_lbPollTimer) _startLbPoll()
+
   const savedUrls = urlsRes.urls || []
 
   // If server returned an error (e.g. TMDB not configured), show it
   if (!moviesRes.ok) {
-    const urlManager2 = _lbUrlManager(savedUrls)
-    c.innerHTML = urlManager2 + emptyStateHTML(moviesRes.error || "Failed to load movies")
+    c.innerHTML = _lbUrlManager(savedUrls) + emptyStateHTML(moviesRes.error || "Failed to load movies")
     return
   }
 
@@ -932,8 +954,12 @@ async function addLbUrl(input) {
     const res = await api("/api/letterboxd/urls", "POST", { url })
     if (res.ok) {
       input.value = ""
-      toast("List added — refreshing…", "gold")
+      if (btn) { btn.disabled = false; btn.textContent = "+ Add" }
+      toast("List added — fetching in background…", "gold")
+      // Re-render immediately (shows new URL in list, cached movies stay)
       await renderLetterboxd()
+      // Server already started a refresh; poll for when it finishes
+      _startLbPoll()
     } else {
       toast(res.error || "Failed to add URL", "error")
       if (btn) { btn.disabled = false; btn.textContent = "+ Add" }
@@ -948,12 +974,47 @@ async function removeLbUrl(url, btn) {
   btn.disabled = true
   try {
     await api("/api/letterboxd/urls/remove", "POST", { url })
-    toast("List removed", "gold")
+    btn.disabled = false
+    toast("List removed — refreshing in background…", "gold")
+    // Re-render immediately (URL gone from list, movies still cached)
     await renderLetterboxd()
+    _startLbPoll()
   } catch(e) {
     toast(`Failed to remove: ${e?.message || "unknown error"}`, "error")
     btn.disabled = false
   }
+}
+
+async function triggerLbRefresh() {
+  try {
+    await api("/api/letterboxd/refresh", "POST", {})
+    toast("Refreshing Letterboxd lists…", "gold")
+    _startLbPoll()
+    await renderLetterboxd()   // re-render to show "↻ Refreshing…" badge
+  } catch(e) {
+    toast("Refresh failed", "error")
+  }
+}
+
+function _startLbPoll() {
+  if (_lbPollTimer) return   // already polling
+  const started = Date.now()
+  _lbPollTimer = setInterval(async () => {
+    // Give up after 3 minutes
+    if (Date.now() - started > 180_000) {
+      clearInterval(_lbPollTimer)
+      _lbPollTimer = null
+      return
+    }
+    try {
+      const res = await api("/api/letterboxd/movies")
+      if (res.fetched_at && res.fetched_at !== _lbLastFetched) {
+        clearInterval(_lbPollTimer)
+        _lbPollTimer = null
+        if (ACTIVE_TAB === "letterboxd") await renderLetterboxd()
+      }
+    } catch(_) { /* ignore transient poll errors */ }
+  }, 5000)
 }
 
 /* ── Ignored ─────────────────────────────────────────────── */

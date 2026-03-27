@@ -23,10 +23,11 @@ from app.auth import (
     create_token, verify_token, generate_secret_key,
 )
 
-DATA_DIR       = os.getenv("DATA_DIR", "/data")
-RESULTS_FILE   = f"{DATA_DIR}/results.json"
-OVERRIDES_FILE = f"{DATA_DIR}/overrides.json"
-LOG_FILE       = f"{DATA_DIR}/cineplete.log"
+DATA_DIR              = os.getenv("DATA_DIR", "/data")
+RESULTS_FILE          = f"{DATA_DIR}/results.json"
+OVERRIDES_FILE        = f"{DATA_DIR}/overrides.json"
+LOG_FILE              = f"{DATA_DIR}/cineplete.log"
+LETTERBOXD_CACHE_FILE = f"{DATA_DIR}/letterboxd_cache.json"
 
 APP_VERSION  = os.getenv("APP_VERSION", "dev")
 STATIC_DIR   = os.getenv("STATIC_DIR", "/app/static")
@@ -511,6 +512,124 @@ def _tmdb_search(api_key: str, title: str, year=None) -> int | None:
         return None
 
 
+# --------------------------------------------------
+# Letterboxd background refresh state
+# --------------------------------------------------
+import threading as _threading
+
+_lb_lock       = _threading.Lock()
+_lb_refreshing = False
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _lb_do_refresh() -> None:
+    """Background worker: fetches all saved Letterboxd URLs and writes cache."""
+    global _lb_refreshing
+    try:
+        from app.tmdb import TMDB
+        from collections import Counter as _Counter
+
+        cfg          = load_config()
+        api_key      = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+        flaresolverr = cfg.get("FLARESOLVERR", {}).get("FLARESOLVERR_URL", "").rstrip("/")
+        if not api_key:
+            log.warning("Letterboxd refresh skipped — TMDB API key not configured")
+            return
+
+        ov   = load_json(OVERRIDES_FILE)
+        urls = ov.get("letterboxd_urls", [])
+        if not urls:
+            save_json(LETTERBOXD_CACHE_FILE, {
+                "ok": True, "movies": [], "urls": [], "unique": 0,
+                "owned_count": 0, "url_status": [], "fetched_at": _now_iso(),
+            })
+            return
+
+        counts:     _Counter      = _Counter()
+        url_status: list[dict]    = []
+
+        for lb_url in urls:
+            raw      = _fetch_letterboxd_rss(lb_url, flaresolverr=flaresolverr)
+            seen:set = set()
+            resolved = 0
+            for item in raw:
+                tid = item.get("tmdb_id")
+                if not tid and item.get("title"):
+                    tid = _tmdb_search(api_key, item["title"], item.get("year"))
+                if tid and tid not in seen:
+                    counts[tid] += 1
+                    seen.add(tid)
+                    resolved += 1
+            url_status.append({"url": lb_url, "raw": len(raw), "resolved": resolved})
+            log.debug(f"Letterboxd refresh: {lb_url} → {len(raw)} raw, {resolved} resolved")
+
+        t           = TMDB(api_key)
+        wishlist    = set(ov.get("wishlist_movies", []))
+        ignored     = set(ov.get("ignore_movies",  []))
+        owned       = load_snapshot()
+        movies      = []
+        owned_count = 0
+
+        for tid, score in counts.most_common():
+            if tid in ignored:
+                continue
+            if tid in owned:
+                owned_count += 1
+                continue
+            md = t.get(f"https://api.themoviedb.org/3/movie/{tid}?api_key={api_key}")
+            if not md or md.get("success") is False:
+                continue
+            movies.append({
+                "tmdb":     tid,
+                "title":    md.get("title"),
+                "year":     (md.get("release_date") or "")[:4],
+                "poster":   t.poster_url(md.get("poster_path")),
+                "rating":   md.get("vote_average", 0),
+                "score":    score,
+                "wishlist": tid in wishlist,
+            })
+
+        movies.sort(key=lambda m: (-m["score"], -(m["rating"] or 0)))
+
+        save_json(LETTERBOXD_CACHE_FILE, {
+            "ok":          True,
+            "movies":      movies,
+            "urls":        urls,
+            "unique":      len(counts),
+            "owned_count": owned_count,
+            "url_status":  url_status,
+            "fetched_at":  _now_iso(),
+        })
+        log.info(
+            f"Letterboxd refresh complete: {len(movies)} movies "
+            f"(owned filtered: {owned_count})"
+        )
+
+    except Exception:
+        log.exception("Letterboxd background refresh failed")
+    finally:
+        with _lb_lock:
+            _lb_refreshing = False
+
+
+def _lb_start_refresh() -> bool:
+    """Spawn a background refresh thread. Returns True if started, False if already running."""
+    global _lb_refreshing
+    with _lb_lock:
+        if _lb_refreshing:
+            return False
+        _lb_refreshing = True
+    _threading.Thread(target=_lb_do_refresh, daemon=True, name="lb-refresh").start()
+    log.debug("Letterboxd background refresh started")
+    return True
+
+
+# --------------------------------------------------
+
 def _fetch_via_flaresolverr(rss_url: str, flaresolverr_url: str) -> bytes | None:
     """
     Route a request through FlareSolverr to bypass Cloudflare.
@@ -761,6 +880,7 @@ def letterboxd_add_url(payload: dict = Body(...)):
     if url not in ov["letterboxd_urls"]:
         ov["letterboxd_urls"].append(url)
         save_json(OVERRIDES_FILE, ov)
+        _lb_start_refresh()
     return {"ok": True}
 
 
@@ -772,87 +892,40 @@ def letterboxd_remove_url(payload: dict = Body(...)):
     if url in urls:
         urls.remove(url)
         save_json(OVERRIDES_FILE, ov)
+        _lb_start_refresh()
     return {"ok": True}
 
 
 @app.get("/api/letterboxd/movies")
 def letterboxd_get_movies():
     """
-    Fetch all saved Letterboxd URLs, merge their movie lists, score each
-    movie by how many lists it appears in, enrich with TMDB metadata, and
-    return sorted by score desc (ties broken by TMDB rating).
+    Return cached Letterboxd movies immediately — never fetches live.
+    Cache is written by _lb_do_refresh() running in a background thread.
     """
-    cfg             = load_config()
-    api_key         = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
-    flaresolverr    = cfg.get("FLARESOLVERR", {}).get("FLARESOLVERR_URL", "").rstrip("/")
-    if not api_key:
-        return {"ok": False, "error": "TMDB API key not configured"}
+    with _lb_lock:
+        currently_refreshing = _lb_refreshing
+    cache = load_json(LETTERBOXD_CACHE_FILE)
+    if not cache:
+        ov   = load_json(OVERRIDES_FILE)
+        urls = ov.get("letterboxd_urls", [])
+        return {
+            "ok":            True,
+            "movies":        [],
+            "urls":          urls,
+            "fetched_at":    None,
+            "refreshing":    currently_refreshing,
+            "needs_refresh": bool(urls) and not currently_refreshing,
+        }
+    return {**cache, "refreshing": currently_refreshing}
 
-    ov   = load_json(OVERRIDES_FILE)
-    urls = ov.get("letterboxd_urls", [])
-    if not urls:
-        return {"ok": True, "movies": [], "urls": []}
 
-    counts: Counter = Counter()   # tmdb_id (int) → appearance count
-    url_status: list[dict] = []   # per-URL fetch results for UI feedback
-
-    for lb_url in urls:
-        raw = _fetch_letterboxd_rss(lb_url, flaresolverr=flaresolverr)
-        seen_this_url: set = set()
-        resolved = 0
-        for item in raw:
-            tmdb_id = item.get("tmdb_id")
-            if not tmdb_id and item.get("title"):
-                tmdb_id = _tmdb_search(api_key, item["title"], item.get("year"))
-            if tmdb_id and tmdb_id not in seen_this_url:
-                counts[tmdb_id] += 1
-                seen_this_url.add(tmdb_id)
-                resolved += 1
-        url_status.append({
-            "url":      lb_url,
-            "raw":      len(raw),
-            "resolved": resolved,
-        })
-
-    if not counts:
-        return {"ok": True, "movies": [], "urls": urls, "url_status": url_status}
-
-    t        = TMDB(api_key)
-    wishlist = set(ov.get("wishlist_movies", []))
-    ignored  = set(ov.get("ignore_movies", []))
-    owned    = load_snapshot()   # set of TMDB IDs already in the user's library
-
-    movies      = []
-    owned_count = 0
-    for tmdb_id, score in counts.most_common():
-        if tmdb_id in ignored:
-            continue
-        if tmdb_id in owned:
-            owned_count += 1
-            continue
-        md = t.get(f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={api_key}")
-        if not md or md.get("success") is False:
-            continue
-        movies.append({
-            "tmdb":     tmdb_id,
-            "title":    md.get("title"),
-            "year":     (md.get("release_date") or "")[:4],
-            "poster":   t.poster_url(md.get("poster_path")),
-            "rating":   md.get("vote_average", 0),
-            "score":    score,
-            "wishlist": tmdb_id in wishlist,
-        })
-
-    # Sort: score desc, then rating desc as tie-breaker
-    movies.sort(key=lambda m: (-m["score"], -(m["rating"] or 0)))
-
-    return {
-        "ok":          True,
-        "movies":      movies,
-        "urls":        urls,
-        "unique":      len(counts),    # unique TMDB IDs found (before owned/ignored filter)
-        "owned_count": owned_count,    # how many were hidden because already in library
-    }
+@app.post("/api/letterboxd/refresh")
+def letterboxd_trigger_refresh():
+    """Kick off a background refresh of all Letterboxd URLs. Returns immediately."""
+    started = _lb_start_refresh()
+    with _lb_lock:
+        refreshing = _lb_refreshing
+    return {"ok": True, "started": started, "refreshing": refreshing}
 
 
 # --------------------------------------------------
