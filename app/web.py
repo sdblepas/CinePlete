@@ -507,26 +507,35 @@ def _tmdb_search(api_key: str, title: str, year=None) -> int | None:
         return None
 
 
-def _fetch_letterboxd_rss(url: str) -> list[dict]:
+def _fetch_letterboxd_rss(url: str, _depth: int = 0) -> list[dict]:
     """
     Fetch movies from a Letterboxd RSS feed.
 
     Accepts any public Letterboxd URL and derives the RSS endpoint:
       /username/watchlist/      → /username/watchlist/rss/
       /username/list/my-list/   → /username/list/my-list/rss/
-      /username/rss/            → used as-is (diary)
-      /username/films/          → /username/films/rss/  (rated-films RSS)
+      /username/rss/            → used as-is (diary or lists feed)
+      /username/films/          → /username/rss/ (no dedicated films RSS)
 
-    Element matching is done by local-name only (namespace-agnostic) to handle
-    variations in how Letterboxd declares the tmdb/letterboxd namespace URIs.
+    Element matching is namespace-agnostic (local name only) to handle
+    variations in the Letterboxd tmdb/letterboxd namespace URI declarations.
+
+    Auto-expansion: if the RSS is a "lists feed" (items link to /list/ pages
+    rather than films with tmdb:movieId / letterboxd:filmTitle), each linked
+    list's own RSS is fetched automatically (one level deep, max 10 lists).
+    This handles curator accounts like mscorsese whose /rss/ feed is a
+    directory of their curated lists rather than a personal diary.
     """
     import xml.etree.ElementTree as ET
 
     path = urlparse(url).path.rstrip("/")
 
-    # Already an explicit RSS path → use as-is
     if path.endswith("/rss"):
         rss_url = url.rstrip("/") + "/"
+    elif path.endswith("/films"):
+        # No /films/rss/ endpoint — fall back to the user's diary RSS
+        username = path.lstrip("/").split("/")[0]
+        rss_url = f"https://letterboxd.com/{username}/rss/"
     else:
         rss_url = url.rstrip("/") + "/rss/"
 
@@ -548,33 +557,50 @@ def _fetch_letterboxd_rss(url: str) -> list[dict]:
     except ET.ParseError:
         return []
 
-    # Helper: extract local name from Clark-notation tag "{uri}local" or "local"
+    # Extract local name from Clark-notation "{uri}local" or plain "local"
     def local(tag: str) -> str:
         return tag.split("}")[-1] if "}" in tag else tag
 
-    movies = []
+    movies: list[dict]   = []
+    list_links: list[str] = []   # collected when items are lists, not films
+
     for item in root.findall(".//item"):
         tmdb_id = title = year = None
+        item_link: str | None = None
 
         for child in item:
             lname = local(child.tag)
-            if lname == "movieId" and child.text:
+            text  = (child.text or "").strip()
+            if not text:
+                continue
+            if lname == "movieId":
                 try:
-                    tmdb_id = int(child.text)
+                    tmdb_id = int(text)
                 except (ValueError, TypeError):
                     pass
-            elif lname == "filmTitle" and child.text:
-                title = child.text
-            elif lname == "filmYear" and child.text:
+            elif lname == "filmTitle":
+                title = text
+            elif lname == "filmYear":
                 try:
-                    year = int(child.text)
+                    year = int(text)
                 except ValueError:
                     pass
+            elif lname == "link" and "/list/" in text:
+                item_link = text
 
         if tmdb_id:
             movies.append({"tmdb_id": tmdb_id})
         elif title:
             movies.append({"title": title, "year": year})
+        elif item_link:
+            list_links.append(item_link)
+
+    # If no film entries found but list links were collected (e.g. a curator's
+    # profile RSS), recursively fetch each linked list — one level deep only.
+    if not movies and list_links and _depth == 0:
+        log.debug(f"Letterboxd: lists feed detected at {rss_url}, expanding {len(list_links)} lists")
+        for list_url in list_links[:10]:
+            movies.extend(_fetch_letterboxd_rss(list_url, _depth=1))
 
     return movies
 

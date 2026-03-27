@@ -805,10 +805,12 @@ function _lbUrlManager(savedUrls, moviesRes) {
           </button>
         </div>
         <p style="color:var(--text3);font-size:.7rem;margin:0">
-          Tip: use a watchlist or named list URL — e.g.
-          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/watchlist/</code> or
-          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/list/best-of-2024/</code>.
-          The list must be public.
+          Supports watchlists, named lists, diary feeds and profile RSS.
+          E.g. <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/watchlist/</code> ·
+          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/list/best-of-2024/</code> ·
+          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/rss/</code>.
+          Profile RSS feeds from curators are auto-expanded into their individual lists.
+          All lists must be public.
         </p>
       </div>
     </div>`
