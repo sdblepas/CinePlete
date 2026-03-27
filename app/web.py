@@ -487,7 +487,7 @@ def wishlist_remove(payload: dict = Body(...)):
 
 
 # --------------------------------------------------
-# Watchlist import (Letterboxd / Trakt)
+# Watchlist import (Letterboxd via RSS)
 # --------------------------------------------------
 
 def _tmdb_search(api_key: str, title: str, year=None) -> int | None:
@@ -507,113 +507,76 @@ def _tmdb_search(api_key: str, title: str, year=None) -> int | None:
         return None
 
 
-def _scrape_letterboxd(url: str) -> list[dict]:
+def _fetch_letterboxd_rss(url: str) -> list[dict]:
     """
-    Scrape a public Letterboxd list/watchlist URL.
-    Returns a list of {title, year} dicts.
-    Handles pagination (?page=N).
+    Fetch movies from a Letterboxd RSS feed.
+
+    Accepts any public Letterboxd URL and derives the RSS endpoint:
+      /username/watchlist/      → /username/watchlist/rss/
+      /username/list/my-list/   → /username/list/my-list/rss/
+      /username/rss/            → used as-is
+      /username/films/          → /username/rss/  (diary feed, most recent 200)
+
+    The RSS feed includes <tmdb:movieId> so no TMDB search is needed.
+    Falls back to <letterboxd:filmTitle> + <letterboxd:filmYear> for entries
+    that predate TMDB linking (rare) — those are resolved via TMDB search.
     """
-    from html.parser import HTMLParser
-    import re
-
-    class _LBParser(HTMLParser):
-        def __init__(self):
-            super().__init__()
-            self.movies = []
-            self._in_poster = False
-
-        def handle_starttag(self, tag, attrs):
-            attrs = dict(attrs)
-            if tag == "li" and "poster-container" in attrs.get("class", ""):
-                name = attrs.get("data-film-name", "").strip()
-                year = attrs.get("data-film-release-year", "").strip()
-                if name:
-                    self.movies.append({"title": name, "year": int(year) if year.isdigit() else None})
-
-    base = url.rstrip("/")
-    movies: list[dict] = []
-    page = 1
-    while True:
-        page_url = f"{base}/page/{page}/" if page > 1 else f"{base}/"
-        try:
-            resp = requests.get(page_url, headers={"User-Agent": "CinePlete/1.0"}, timeout=10)
-        except requests.exceptions.RequestException:
-            break
-        if resp.status_code != 200:
-            break
-        parser = _LBParser()
-        parser.feed(resp.text)
-        if not parser.movies:
-            break
-        movies.extend(parser.movies)
-        # Letterboxd shows 72 per page; if fewer, we're on the last page
-        if len(parser.movies) < 72:
-            break
-        page += 1
-    return movies
-
-
-def _fetch_trakt(url: str, client_id: str) -> list[dict]:
-    """
-    Fetch movies from a public Trakt list/watchlist URL via the Trakt API.
-    Returns a list of {tmdb_id} dicts (TMDB IDs come directly from the API).
-
-    Supported URL patterns:
-      https://trakt.tv/lists/{id}
-      https://trakt.tv/users/{user}/lists/{slug}
-      https://trakt.tv/users/{user}/watchlist
-    """
-    import re
-
-    headers = {
-        "Content-Type": "application/json",
-        "trakt-api-version": "2",
-        "trakt-api-key": client_id,
-    }
+    import xml.etree.ElementTree as ET
 
     path = urlparse(url).path.rstrip("/")
 
-    # Global list by numeric ID: /lists/11057926
-    m = re.match(r"^/lists/(\d+)$", path)
-    if m:
-        api_url = f"https://api.trakt.tv/lists/{m.group(1)}/items/movies"
-    # User list: /users/{user}/lists/{slug}
-    elif re.match(r"^/users/[^/]+/lists/[^/]+$", path):
-        parts = path.lstrip("/").split("/")  # ['users', user, 'lists', slug]
-        api_url = f"https://api.trakt.tv/users/{parts[1]}/lists/{parts[3]}/items/movies"
-    # User watchlist: /users/{user}/watchlist
-    elif re.match(r"^/users/[^/]+/watchlist$", path):
-        parts = path.lstrip("/").split("/")  # ['users', user, 'watchlist']
-        api_url = f"https://api.trakt.tv/users/{parts[1]}/watchlist/movies"
+    # Already an RSS path → use as-is
+    if path.endswith("/rss"):
+        rss_url = url.rstrip("/") + "/"
+    # /films page has no dedicated RSS; fall back to the user diary feed
+    elif path.endswith("/films"):
+        rss_url = "https://letterboxd.com/" + path.lstrip("/").split("/")[0] + "/rss/"
     else:
+        rss_url = url.rstrip("/") + "/rss/"
+
+    try:
+        resp = requests.get(
+            rss_url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; CinePlete/1.0)"},
+            timeout=10,
+        )
+    except requests.exceptions.RequestException:
         return []
 
+    if resp.status_code != 200:
+        return []
+
+    try:
+        root = ET.fromstring(resp.content)
+    except ET.ParseError:
+        return []
+
+    ns = {
+        "letterboxd": "https://letterboxd.com",
+        "tmdb":       "https://themoviedb.org/",
+    }
+
     movies = []
-    page = 1
-    while True:
-        try:
-            resp = requests.get(
-                api_url,
-                headers=headers,
-                params={"page": page, "limit": 100},
-                timeout=10,
-            )
-        except requests.exceptions.RequestException:
-            break
-        if resp.status_code != 200:
-            break
-        items = resp.json()
-        if not items:
-            break
-        for item in items:
-            movie = item.get("movie", {})
-            tmdb_id = movie.get("ids", {}).get("tmdb")
-            if tmdb_id:
-                movies.append({"tmdb_id": tmdb_id})
-        total_pages = int(resp.headers.get("X-Pagination-Page-Count", 1))
-        if page >= total_pages:
-            break
-        page += 1
+    for item in root.findall(".//item"):
+        # Prefer direct TMDB ID
+        tmdb_el = item.find("tmdb:movieId", ns)
+        if tmdb_el is not None and tmdb_el.text:
+            try:
+                movies.append({"tmdb_id": int(tmdb_el.text)})
+                continue
+            except (ValueError, TypeError):
+                pass
+        # Fallback: title + year for TMDB search
+        title_el = item.find("letterboxd:filmTitle", ns)
+        year_el  = item.find("letterboxd:filmYear",  ns)
+        if title_el is not None and title_el.text:
+            year = None
+            if year_el is not None and year_el.text:
+                try:
+                    year = int(year_el.text)
+                except ValueError:
+                    pass
+            movies.append({"title": title_el.text, "year": year})
 
     return movies
 
@@ -621,9 +584,10 @@ def _fetch_trakt(url: str, client_id: str) -> list[dict]:
 @app.post("/api/import/watchlist")
 def import_watchlist(payload: dict = Body(...)):
     """
-    Import movies from a public Letterboxd or Trakt list URL into the wishlist.
-    - Trakt: uses the Trakt API (requires TRAKT_CLIENT_ID in config), gets TMDB IDs directly
-    - Letterboxd: scrapes the public list, resolves titles via TMDB search (requires TMDB API key)
+    Import movies from a public Letterboxd URL into the wishlist via RSS.
+    Supports: watchlist, named lists, diary feed (/rss/), and /films/ pages.
+    TMDB IDs come directly from the RSS feed; title-only entries are resolved
+    via TMDB search (requires TMDB API key in config).
     """
     url = str(payload.get("url", "")).strip()
     if not url:
@@ -634,50 +598,149 @@ def import_watchlist(payload: dict = Body(...)):
         return {"ok": False, "error": "Invalid URL"}
 
     host = parsed.netloc.lower().replace("www.", "")
-    cfg  = load_config()
+    if "letterboxd.com" not in host:
+        return {"ok": False, "error": "Only Letterboxd URLs are supported"}
+
+    cfg     = load_config()
+    api_key = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+
+    raw = _fetch_letterboxd_rss(url)
+    if not raw:
+        return {"ok": False, "error": "No movies found — check the URL is a public Letterboxd list or watchlist"}
 
     ov       = load_json(OVERRIDES_FILE)
     existing = set(ov.get("wishlist_movies", []))
     added    = 0
     skipped  = 0
 
-    if "trakt.tv" in host:
-        client_id = cfg.get("TRAKT", {}).get("TRAKT_CLIENT_ID", "").strip()
-        if not client_id:
-            return {"ok": False, "error": "Trakt Client ID not configured — add it in Settings → Trakt"}
-        raw = _fetch_trakt(url, client_id)
-        if not raw:
-            return {"ok": False, "error": "No movies found — check the URL is a public Trakt list"}
-        for item in raw:
-            tmdb_id = item.get("tmdb_id")
-            if not tmdb_id or tmdb_id in existing:
+    for item in raw:
+        tmdb_id = item.get("tmdb_id")
+        if not tmdb_id:
+            # Needs TMDB search — only possible if API key is configured
+            if not api_key:
                 skipped += 1
                 continue
-            add_unique(ov["wishlist_movies"], tmdb_id)
-            existing.add(tmdb_id)
-            added += 1
-
-    elif "letterboxd.com" in host:
-        api_key = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
-        if not api_key:
-            return {"ok": False, "error": "TMDB API key not configured"}
-        raw = _scrape_letterboxd(url)
-        if not raw:
-            return {"ok": False, "error": "No movies found — check it's a public Letterboxd list"}
-        for movie in raw:
-            tmdb_id = _tmdb_search(api_key, movie["title"], movie.get("year"))
-            if not tmdb_id or tmdb_id in existing:
-                skipped += 1
-                continue
-            add_unique(ov["wishlist_movies"], tmdb_id)
-            existing.add(tmdb_id)
-            added += 1
-
-    else:
-        return {"ok": False, "error": "Only Letterboxd and Trakt URLs are supported"}
+            tmdb_id = _tmdb_search(api_key, item["title"], item.get("year"))
+        if not tmdb_id or tmdb_id in existing:
+            skipped += 1
+            continue
+        add_unique(ov["wishlist_movies"], tmdb_id)
+        existing.add(tmdb_id)
+        added += 1
 
     save_json(OVERRIDES_FILE, ov)
     return {"ok": True, "added": added, "skipped": skipped, "total": added + skipped}
+
+
+# --------------------------------------------------
+# Letterboxd tab — persistent URL list + scored movies
+# --------------------------------------------------
+
+def _validate_letterboxd_url(url: str):
+    """Return (cleaned_url, error_string_or_None)."""
+    url = url.strip()
+    if not url:
+        return None, "URL is required"
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return None, "Invalid URL"
+    host = parsed.netloc.lower().replace("www.", "")
+    if "letterboxd.com" not in host:
+        return None, "Only Letterboxd URLs are supported"
+    return url, None
+
+
+@app.get("/api/letterboxd/urls")
+def letterboxd_get_urls():
+    ov = load_json(OVERRIDES_FILE)
+    return {"ok": True, "urls": ov.get("letterboxd_urls", [])}
+
+
+@app.post("/api/letterboxd/urls")
+def letterboxd_add_url(payload: dict = Body(...)):
+    url, err = _validate_letterboxd_url(str(payload.get("url", "")))
+    if err:
+        return {"ok": False, "error": err}
+    ov = load_json(OVERRIDES_FILE)
+    ov.setdefault("letterboxd_urls", [])
+    if url not in ov["letterboxd_urls"]:
+        ov["letterboxd_urls"].append(url)
+        save_json(OVERRIDES_FILE, ov)
+    return {"ok": True}
+
+
+@app.post("/api/letterboxd/urls/remove")
+def letterboxd_remove_url(payload: dict = Body(...)):
+    url = str(payload.get("url", "")).strip()
+    ov  = load_json(OVERRIDES_FILE)
+    urls = ov.get("letterboxd_urls", [])
+    if url in urls:
+        urls.remove(url)
+        save_json(OVERRIDES_FILE, ov)
+    return {"ok": True}
+
+
+@app.get("/api/letterboxd/movies")
+def letterboxd_get_movies():
+    """
+    Fetch all saved Letterboxd URLs, merge their movie lists, score each
+    movie by how many lists it appears in, enrich with TMDB metadata, and
+    return sorted by score desc (ties broken by TMDB rating).
+    """
+    from app.tmdb import TMDB
+    from collections import Counter
+
+    cfg = load_config()
+    api_key = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "error": "TMDB API key not configured"}
+
+    ov   = load_json(OVERRIDES_FILE)
+    urls = ov.get("letterboxd_urls", [])
+    if not urls:
+        return {"ok": True, "movies": [], "urls": []}
+
+    counts: Counter = Counter()   # tmdb_id (int) → appearance count
+
+    for lb_url in urls:
+        raw = _fetch_letterboxd_rss(lb_url)
+        seen_this_url: set = set()
+        for item in raw:
+            tmdb_id = item.get("tmdb_id")
+            if not tmdb_id and item.get("title"):
+                tmdb_id = _tmdb_search(api_key, item["title"], item.get("year"))
+            if tmdb_id and tmdb_id not in seen_this_url:
+                counts[tmdb_id] += 1
+                seen_this_url.add(tmdb_id)
+
+    if not counts:
+        return {"ok": True, "movies": [], "urls": urls}
+
+    t        = TMDB(api_key)
+    wishlist = set(ov.get("wishlist_movies", []))
+    ignored  = set(ov.get("ignore_movies", []))
+
+    movies = []
+    for tmdb_id, score in counts.most_common():
+        if tmdb_id in ignored:
+            continue
+        md = t.get(f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={api_key}")
+        if not md or md.get("success") is False:
+            continue
+        movies.append({
+            "tmdb":     tmdb_id,
+            "title":    md.get("title"),
+            "year":     (md.get("release_date") or "")[:4],
+            "poster":   t.poster_url(md.get("poster_path")),
+            "rating":   md.get("vote_average", 0),
+            "score":    score,
+            "wishlist": tmdb_id in wishlist,
+        })
+
+    # Sort: score desc, then rating desc as tie-breaker
+    movies.sort(key=lambda m: (-m["score"], -(m["rating"] or 0)))
+
+    return {"ok": True, "movies": movies, "urls": urls}
 
 
 # --------------------------------------------------

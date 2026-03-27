@@ -10,6 +10,7 @@ DEFAULT = {
     "ignore_actors": [],
     "wishlist_movies": [],
     "rec_fetched_ids": [],   # TMDB IDs whose recommendations have already been fetched
+    "letterboxd_urls": [],   # saved Letterboxd list/watchlist URLs for the Letterboxd tab
 }
 
 
