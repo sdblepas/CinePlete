@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 DEFAULT = {
     "ignore_movies": [],
+    "ignore_movies_meta": {},   # {str(tmdb_id): {title, year, poster}} for UI display
     "ignore_franchises": [],
     "ignore_directors": [],
     "ignore_actors": [],

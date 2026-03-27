@@ -143,6 +143,9 @@ function posterCard(m, extraTag = "") {
     ? `<button class="btn-sm btn-wishlisted" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
     : `<button class="btn-sm btn-wishlist"   onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆</button>`
 
+  const ignoreBtn = `<button class="btn-sm btn-ignore" title="Don't want this"
+    onclick="event.stopPropagation();ignoreMovie(${tmdb},'${safeName}',${m.year||"null"},'${m.poster||""}',this)">🚫</button>`
+
   const rating = parseFloat(m.rating || 0).toFixed(1)
 
   const imgHtml = m.poster
@@ -168,7 +171,7 @@ function posterCard(m, extraTag = "") {
     </div>
     <div class="pc-overlay">
       <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
-      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}</div>
+      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${ignoreBtn}</div>
     </div>
   </div>`
 }
@@ -225,6 +228,24 @@ async function removeWishlist(tmdb, btn){
   btn.textContent = "☆ Wishlist"
   btn.onclick     = () => addWishlist(tmdb,btn)
   toast("Removed from Wishlist")
+}
+
+async function ignoreMovie(tmdb, title, year, poster, btn) {
+  btn.disabled = true
+  const res = await api("/api/ignore", "POST", { kind: "movie", value: tmdb, title, year, poster })
+  if (res.ok) {
+    toast(`"${title}" hidden — won't appear again`, "success")
+    const card = btn.closest(".pc")
+    if (card) {
+      card.style.transition = "opacity .3s, transform .3s"
+      card.style.opacity = "0"
+      card.style.transform = "scale(.95)"
+      setTimeout(() => card.remove(), 320)
+    }
+  } else {
+    btn.disabled = false
+    toast(`Could not ignore: ${res.error || "unknown error"}`, "error")
+  }
 }
 
 async function addToRadarr(tmdb, title, btn){
@@ -731,9 +752,112 @@ function renderSuggestions(){
 function renderWishlist(){
   const c    = document.getElementById("content")
   const list = applyFilters(DATA.wishlist||[])
-  if (!list.length){ c.innerHTML=emptyStateHTML("Wishlist is empty"); return }
+
+  const importBar = `
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap">
+      <input id="importUrl" type="url" placeholder="Paste a public Letterboxd or Trakt list URL…"
+        style="flex:1;min-width:240px;padding:6px 10px;border-radius:7px;border:1px solid var(--border2);
+               background:var(--bg2);color:var(--text);font-size:.78rem;font-family:'DM Mono',monospace"/>
+      <button onclick="importWatchlist()" class="btn-sm"
+        style="white-space:nowrap;padding:6px 14px;border-radius:7px;border:1px solid var(--border2);
+               background:var(--bg3);color:var(--text2);cursor:pointer;font-size:.75rem;font-family:'DM Mono',monospace">
+        ↓ Import
+      </button>
+    </div>`
+
+  if (!list.length){
+    c.innerHTML = importBar + emptyStateHTML("Wishlist is empty")
+    return
+  }
   const { slice, btn } = _paginate(list, "wishlist")
-  c.innerHTML = `<div class="grid-posters">${slice.map(m=>posterCard(m)).join("")}</div>${btn}`
+  c.innerHTML = importBar + `<div class="grid-posters">${slice.map(m=>posterCard(m)).join("")}</div>${btn}`
+}
+
+async function importWatchlist() {
+  const input = document.getElementById("importUrl")
+  const url   = (input?.value || "").trim()
+  if (!url) { toast("Paste a Letterboxd or Trakt URL first", "error"); return }
+
+  const btn = input.nextElementSibling
+  btn.disabled = true; btn.textContent = "…"
+
+  try {
+    const res = await api("/api/import/watchlist", "POST", { url })
+    if (res.ok) {
+      toast(`Imported ${res.added} movie${res.added!==1?"s":""} (${res.skipped} skipped)`, "success")
+      input.value = ""
+      // Reload wishlist data
+      const data = await api("/api/results")
+      if (data.ok) { DATA = data; renderWishlist() }
+    } else {
+      toast(`Import failed: ${res.error || "unknown error"}`, "error")
+    }
+  } catch(e) {
+    toast("Import failed", "error")
+  } finally {
+    btn.disabled = false; btn.textContent = "↓ Import"
+  }
+}
+
+/* ── Ignored ─────────────────────────────────────────────── */
+
+async function renderIgnored(){
+  const c = document.getElementById("content")
+  c.innerHTML = `<p style="color:var(--text3);font-size:.78rem">Loading…</p>`
+
+  const res = await api("/api/ignored")
+  if (!res.ok) { c.innerHTML = emptyStateHTML("Could not load ignored list"); return }
+
+  const movies = res.movies || []
+  if (!movies.length) {
+    c.innerHTML = emptyStateHTML("No ignored movies — click 🚫 on any card to hide it permanently")
+    return
+  }
+
+  c.innerHTML = `
+    <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">
+      ${movies.length} ignored movie${movies.length!==1?"s":""} — these will never appear in Missing, Classics or Suggestions.
+    </p>
+    <div class="grid-posters">
+      ${movies.map(m => {
+        const safeName = (m.title||"").replace(/'/g,"\\'").replace(/"/g,"&quot;")
+        const imgHtml  = m.poster
+          ? `<img class="pc-img" src="${m.poster}" loading="lazy" alt=""/>`
+          : `<div class="pc-no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 2v20M17 2v20M2 12h20"/></svg><span>No Image</span></div>`
+        return `
+          <div class="pc" id="ignored-${m.tmdb}">
+            ${imgHtml}
+            <div class="pc-info">
+              <div class="pc-title" title="${escHtml(m.title||"")}">${escHtml(m.title||"Untitled")}</div>
+              <div class="pc-meta">${m.year?`<span>${m.year}</span>`:""}</div>
+            </div>
+            <div class="pc-overlay">
+              <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
+              <div class="pc-overlay-actions">
+                <button class="btn-sm" onclick="unignoreMovie(${m.tmdb},'${safeName}',this)"
+                  style="color:var(--green)">↩ Restore</button>
+              </div>
+            </div>
+          </div>`
+      }).join("")}
+    </div>`
+}
+
+async function unignoreMovie(tmdb, title, btn) {
+  btn.disabled = true
+  const res = await api("/api/unignore", "POST", { kind: "movie", value: tmdb })
+  if (res.ok) {
+    toast(`"${title}" restored`, "success")
+    const card = document.getElementById(`ignored-${tmdb}`)
+    if (card) {
+      card.style.transition = "opacity .3s"
+      card.style.opacity    = "0"
+      setTimeout(() => { card.remove() }, 320)
+    }
+  } else {
+    btn.disabled = false
+    toast(`Could not restore: ${res.error || "unknown error"}`, "error")
+  }
 }
 
 /* ── No TMDB GUID ────────────────────────────────────────── */
@@ -888,6 +1012,6 @@ async function copyLetterboxdToClipboard() {
 function updateExportBtn() {
   const btn  = document.getElementById("exportBtn")
   const cbtn = document.getElementById("clipboardBtn")
-  if (btn)  btn.style.display  = EXPORT_TABS.has(ACTIVE_TAB) ? "" : "none"
-  if (cbtn) cbtn.style.display = EXPORT_TABS.has(ACTIVE_TAB) ? "" : "none"
+  if (btn)  btn.style.display  = EXPORT_TABS.has(ACTIVE_TAB) ? "inline-block" : "none"
+  if (cbtn) cbtn.style.display = EXPORT_TABS.has(ACTIVE_TAB) ? "inline-block" : "none"
 }

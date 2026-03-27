@@ -274,6 +274,8 @@ The `field()` helper in `config.js` renders a `type="password"` input with a sho
 - **Dashboard charts** (donut + KPI strip) — v2.5.x
 - **Smart authentication** — network-aware, local bypass, PBKDF2, sliding cookie — v2.5.x
 - **Watchtower on-demand update** — `POST /v1/update?scope=cineplete` — v2.4.x
+- **Watchtower UI** — "Update now" button in Settings + auto-update toggle — v2.7.x
+- **New release notification** — non-intrusive badge in sidebar footer when newer version on GitHub — v2.7.x
 
 ## Backlog (next version)
 
@@ -281,8 +283,6 @@ The `field()` helper in `config.js` renders a `type="password"` input with a sho
 
 - **Ignore list** — mark a movie as "don't want" so it permanently disappears from the Missing / Classics / Suggestions tabs without needing to add it to Radarr. UI: a ✕ / 🚫 button on each card that adds the TMDB ID to an ignore set in `overrides.json`. Should be reversible from a dedicated "Ignored" tab or Settings panel.
 
+- **Export button not visible** — the `↓ Export` button exists in the HTML and logic is gated on `EXPORT_TABS` (franchises, directors, actors, classics, suggestions, wishlist), but it does not appear in the toolbar on those tabs. Needs investigation and fix.
+
 - **Trakt / Letterboxd import** — use an external watchlist as the "want" source for the Wishlist tab. User pastes their Trakt or Letterboxd public list URL; backend fetches and maps titles to TMDB IDs; results appear in Wishlist. Keeps the list in sync on each scan.
-
-- **Watchtower auto-update integration** — add a Watchtower section in Settings (similar to Overseerr/Radarr) with URL, API token, and an "Enable auto-update" toggle. Use the Watchtower HTTP API (`WATCHTOWER_HTTP_API_UPDATE=true` on the Watchtower container) — `POST /v1/update` with `Authorization: Bearer <token>`. This lets CinePlete trigger an immediate self-update pull on demand (e.g. when a new release is detected) without needing Docker socket access. Combine with the new release notification below: show a "Update now" button next to the new version badge that calls the Watchtower API. Do NOT use Docker socket mount (`/var/run/docker.sock`) — it exposes full host root access. **The API token field must be a `secret` type input (password-masked with show/hide toggle), same pattern as `cfg_wh_secret` and `cfg_tmdb_key`.**
-
-- **New release notification** — when a newer version is available on GitHub, show a small badge/banner below the current version in the sidebar footer (e.g. "v2.6.2 · New update!" with a link to the GitHub release notes). Implementation: poll `https://api.github.com/repos/sdblepas/CinePlete/releases/latest` from the frontend (or backend `/api/version` endpoint) on page load, compare with the running `APP_VERSION`, and display the badge if a newer tag exists. Link should point to `https://github.com/sdblepas/CinePlete/releases/tag/vX.Y.Z`. Should be non-intrusive (small pill in sidebar footer, not a blocking modal). Cache the GitHub API response to avoid hitting rate limits on every page load.

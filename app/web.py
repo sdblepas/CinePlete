@@ -408,7 +408,13 @@ def api_ignore(payload: dict = Body(...)):
     value = payload.get("value")
 
     if kind == "movie":
-        add_unique(ov["ignore_movies"], int(value))
+        tmdb_id = int(value)
+        add_unique(ov["ignore_movies"], tmdb_id)
+        ov.setdefault("ignore_movies_meta", {})[str(tmdb_id)] = {
+            "title":  payload.get("title", ""),
+            "year":   payload.get("year"),
+            "poster": payload.get("poster"),
+        }
     elif kind == "franchise":
         add_unique(ov["ignore_franchises"], str(value))
     elif kind == "director":
@@ -429,7 +435,9 @@ def api_unignore(payload: dict = Body(...)):
     value = payload.get("value")
 
     if kind == "movie":
-        remove_value(ov["ignore_movies"], int(value))
+        tmdb_id = int(value)
+        remove_value(ov["ignore_movies"], tmdb_id)
+        ov.setdefault("ignore_movies_meta", {}).pop(str(tmdb_id), None)
     elif kind == "franchise":
         remove_value(ov["ignore_franchises"], str(value))
     elif kind == "director":
@@ -439,6 +447,23 @@ def api_unignore(payload: dict = Body(...)):
 
     save_json(OVERRIDES_FILE, ov)
     return {"ok": True}
+
+
+@app.get("/api/ignored")
+def api_ignored():
+    ov   = load_json(OVERRIDES_FILE)
+    ids  = ov.get("ignore_movies", [])
+    meta = ov.get("ignore_movies_meta", {})
+    movies = []
+    for tmdb_id in ids:
+        m = meta.get(str(tmdb_id), {})
+        movies.append({
+            "tmdb":   tmdb_id,
+            "title":  m.get("title", f"Movie {tmdb_id}"),
+            "year":   m.get("year"),
+            "poster": m.get("poster"),
+        })
+    return {"ok": True, "movies": movies}
 
 
 # --------------------------------------------------
@@ -459,6 +484,187 @@ def wishlist_remove(payload: dict = Body(...)):
     remove_value(ov["wishlist_movies"], int(payload.get("tmdb")))
     save_json(OVERRIDES_FILE, ov)
     return {"ok": True}
+
+
+# --------------------------------------------------
+# Watchlist import (Letterboxd / Trakt)
+# --------------------------------------------------
+
+def _tmdb_search(api_key: str, title: str, year=None) -> int | None:
+    """Search TMDB by title+year, return first matching TMDB ID or None."""
+    params = {"api_key": api_key, "query": title, "include_adult": "false"}
+    if year:
+        params["year"] = str(year)
+    try:
+        r = requests.get(
+            "https://api.themoviedb.org/3/search/movie",
+            params=params,
+            timeout=8,
+        )
+        results = r.json().get("results", [])
+        return results[0]["id"] if results else None
+    except Exception:
+        return None
+
+
+def _scrape_letterboxd(url: str) -> list[dict]:
+    """
+    Scrape a public Letterboxd list/watchlist URL.
+    Returns a list of {title, year} dicts.
+    Handles pagination (?page=N).
+    """
+    from html.parser import HTMLParser
+    import re
+
+    class _LBParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.movies = []
+            self._in_poster = False
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "li" and "poster-container" in attrs.get("class", ""):
+                name = attrs.get("data-film-name", "").strip()
+                year = attrs.get("data-film-release-year", "").strip()
+                if name:
+                    self.movies.append({"title": name, "year": int(year) if year.isdigit() else None})
+
+    base = url.rstrip("/")
+    movies: list[dict] = []
+    page = 1
+    while True:
+        page_url = f"{base}/page/{page}/" if page > 1 else f"{base}/"
+        try:
+            resp = requests.get(page_url, headers={"User-Agent": "CinePlete/1.0"}, timeout=10)
+        except requests.exceptions.RequestException:
+            break
+        if resp.status_code != 200:
+            break
+        parser = _LBParser()
+        parser.feed(resp.text)
+        if not parser.movies:
+            break
+        movies.extend(parser.movies)
+        # Letterboxd shows 72 per page; if fewer, we're on the last page
+        if len(parser.movies) < 72:
+            break
+        page += 1
+    return movies
+
+
+def _scrape_trakt(url: str) -> list[dict]:
+    """
+    Scrape a public Trakt list/watchlist URL.
+    Returns a list of {title, year} dicts.
+    """
+    from html.parser import HTMLParser
+
+    class _TraktParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.movies = []
+            self._title = None
+            self._year = None
+            self._capture_title = False
+            self._capture_year = False
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            cls = attrs.get("class", "")
+            if tag == "h3" and "titles-col" in cls:
+                self._capture_title = True
+            if tag == "span" and "year" in cls:
+                self._capture_year = True
+
+        def handle_data(self, data):
+            data = data.strip()
+            if self._capture_title and data:
+                self._title = data
+                self._capture_title = False
+            if self._capture_year and data:
+                try:
+                    self._year = int(data)
+                except ValueError:
+                    self._year = None
+                self._capture_year = False
+                if self._title:
+                    self.movies.append({"title": self._title, "year": self._year})
+                    self._title = None
+                    self._year = None
+
+    movies: list[dict] = []
+    page = 1
+    while True:
+        page_url = f"{url.rstrip('/')}?page={page}" if page > 1 else url
+        try:
+            resp = requests.get(page_url, headers={"User-Agent": "CinePlete/1.0"}, timeout=10)
+        except requests.exceptions.RequestException:
+            break
+        if resp.status_code != 200:
+            break
+        parser = _TraktParser()
+        parser.feed(resp.text)
+        if not parser.movies:
+            break
+        movies.extend(parser.movies)
+        if len(parser.movies) < 30:
+            break
+        page += 1
+    return movies
+
+
+@app.post("/api/import/watchlist")
+def import_watchlist(payload: dict = Body(...)):
+    """
+    Import movies from a public Letterboxd or Trakt list URL into the wishlist.
+    Requires TMDB API key to be configured for title→ID resolution.
+    """
+    url = str(payload.get("url", "")).strip()
+    if not url:
+        return {"ok": False, "error": "URL is required"}
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return {"ok": False, "error": "Invalid URL"}
+
+    host = parsed.netloc.lower().replace("www.", "")
+
+    cfg     = load_config()
+    api_key = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "error": "TMDB API key not configured"}
+
+    # Scrape movie list from service
+    if "letterboxd.com" in host:
+        raw = _scrape_letterboxd(url)
+    elif "trakt.tv" in host:
+        raw = _scrape_trakt(url)
+    else:
+        return {"ok": False, "error": "Only Letterboxd and Trakt URLs are supported"}
+
+    if not raw:
+        return {"ok": False, "error": "No movies found at that URL — check it's a public list"}
+
+    ov = load_json(OVERRIDES_FILE)
+    existing = set(ov.get("wishlist_movies", []))
+
+    added = 0
+    skipped = 0
+    for movie in raw:
+        tmdb_id = _tmdb_search(api_key, movie["title"], movie.get("year"))
+        if not tmdb_id:
+            skipped += 1
+            continue
+        if tmdb_id in existing:
+            skipped += 1
+            continue
+        add_unique(ov["wishlist_movies"], tmdb_id)
+        existing.add(tmdb_id)
+        added += 1
+
+    save_json(OVERRIDES_FILE, ov)
+    return {"ok": True, "added": added, "skipped": skipped, "total": len(raw)}
 
 
 # --------------------------------------------------

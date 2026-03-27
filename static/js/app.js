@@ -19,6 +19,7 @@ const PAGE_TITLES = {
   nomatch:     "TMDB No Match",
   duplicates:  "Multi-Version",
   wishlist:    "Wishlist",
+  ignored:     "Ignored",
   config:      "Configuration",
   logs:        "Logs",
 }
@@ -34,7 +35,7 @@ const TAB_KEYS = {
 ============================================================ */
 
 function render(){
-  if (!DATA && !["config","logs"].includes(ACTIVE_TAB)){
+  if (!DATA && !["config","logs","ignored"].includes(ACTIVE_TAB)){
     renderSkeleton()
     return
   }
@@ -62,6 +63,7 @@ function render(){
   if (ACTIVE_TAB==="nomatch")     return renderNoMatch()
   if (ACTIVE_TAB==="duplicates")  return renderDuplicates()
   if (ACTIVE_TAB==="wishlist")    return renderWishlist()
+  if (ACTIVE_TAB==="ignored")     return renderIgnored()
   if (ACTIVE_TAB==="config")      return renderConfig()
   if (ACTIVE_TAB==="logs")        return renderLogs()
 }
