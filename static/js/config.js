@@ -144,6 +144,7 @@ function renderConfig(){
   const jss   = cfg.JELLYSEERR  ||{}
   const wh    = cfg.WEBHOOK     ||{}
   const wtch  = cfg.WATCHTOWER  ||{}
+  const trakt = cfg.TRAKT       ||{}
   const auth  = cfg.AUTH        ||{}
 
   const mediaServer = (srv.MEDIA_SERVER || "plex").toLowerCase()
@@ -353,6 +354,12 @@ function renderConfig(){
       </div>
 
       <div class="form-section">
+        ${sec('Trakt <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
+        ${field("cfg_trakt_client_id", "Client ID", trakt.TRAKT_CLIENT_ID||"", "secret")}
+        ${hint('Required to import from Trakt lists. Get your free Client ID at <a href="https://trakt.tv/oauth/applications" target="_blank" style="color:var(--blue)">trakt.tv/oauth/applications</a> — only the Client ID is needed, not the secret.')}
+      </div>
+
+      <div class="form-section">
         ${sec('Watchtower <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
         ${check("cfg_wtch_enabled", "Auto-update enabled", wtch.WATCHTOWER_ENABLED)}
         ${field("cfg_wtch_url",   "Watchtower URL",  wtch.WATCHTOWER_URL        ||"")}
@@ -439,6 +446,9 @@ async function saveConfig(){
     WEBHOOK:{
       WEBHOOK_ENABLED: vc("cfg_wh_enabled"),
       WEBHOOK_SECRET:  v("cfg_wh_secret"),
+    },
+    TRAKT:{
+      TRAKT_CLIENT_ID: v("cfg_trakt_client_id"),
     },
     WATCHTOWER:{
       WATCHTOWER_ENABLED:   vc("cfg_wtch_enabled"),

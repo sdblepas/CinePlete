@@ -87,6 +87,9 @@ DEFAULT_CONFIG = {
         "JELLYSEERR_URL": "",
         "JELLYSEERR_API_KEY": "",
     },
+    "TRAKT": {
+        "TRAKT_CLIENT_ID": "",   # From https://trakt.tv/oauth/applications — Client ID only (no secret needed)
+    },
     "WEBHOOK": {
         "WEBHOOK_ENABLED": False,
         "WEBHOOK_SECRET": "",
