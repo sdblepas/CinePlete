@@ -274,15 +274,15 @@ The `field()` helper in `config.js` renders a `type="password"` input with a sho
 - **Dashboard charts** (donut + KPI strip) — v2.5.x
 - **Smart authentication** — network-aware, local bypass, PBKDF2, sliding cookie — v2.5.x
 - **Watchtower on-demand update** — `POST /v1/update?scope=cineplete` — v2.4.x
-- **Watchtower UI** — "Update now" button in Settings + auto-update toggle — v2.7.x
-- **New release notification** — non-intrusive badge in sidebar footer when newer version on GitHub — v2.7.x
+- **Watchtower UI** — "Update now" button in Settings + auto-update toggle — v2.4.x
+- **New release notification** — non-intrusive badge in sidebar footer when newer version on GitHub — v2.5.x
+- **Ignore list** — 🚫 button on every movie card, dedicated Ignored tab, reversible, metadata stored — v2.7.0
+- **Export button fix** — was hidden on all tabs due to CSS specificity conflict — v2.7.0
+- **Letterboxd tab** — persistent URL list, multi-list scoring (×N badge), owned movies filtered, curator RSS auto-expansion, description HTML fallback — v2.7.0
+- **FlareSolverr support** — automatic fallback for Cloudflare-blocked Letterboxd list RSS feeds — v2.7.0
 
 ## Backlog (next version)
 
 - **Multiple library support** — currently only one Plex/Jellyfin movie library can be scanned at a time. Users with separate libraries (e.g. 4K + 1080p, or Movies + Anime) need to reconfigure to switch. Future work: allow selecting or scanning multiple libraries and merging results.
 
-- **Ignore list** — mark a movie as "don't want" so it permanently disappears from the Missing / Classics / Suggestions tabs without needing to add it to Radarr. UI: a ✕ / 🚫 button on each card that adds the TMDB ID to an ignore set in `overrides.json`. Should be reversible from a dedicated "Ignored" tab or Settings panel.
-
-- **Export button not visible** — the `↓ Export` button exists in the HTML and logic is gated on `EXPORT_TABS` (franchises, directors, actors, classics, suggestions, wishlist), but it does not appear in the toolbar on those tabs. Needs investigation and fix.
-
-- **Trakt / Letterboxd import** — use an external watchlist as the "want" source for the Wishlist tab. User pastes their Trakt or Letterboxd public list URL; backend fetches and maps titles to TMDB IDs; results appear in Wishlist. Keeps the list in sync on each scan.
+- **Letterboxd tab: background fetch + caching** — `GET /api/letterboxd/movies` currently fetches all RSS URLs synchronously at request time (up to 10+ HTTP calls, each with FlareSolverr potentially adding 70s). With curator accounts that expand into many lists, this can make the endpoint feel broken. Fix: cache the last successful fetch result in `overrides.json` or a separate file, refresh in background (on add/remove URL, or on a TTL), and return the cached result immediately on page load. Add a "last updated" timestamp to the UI.
