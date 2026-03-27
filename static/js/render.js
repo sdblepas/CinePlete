@@ -143,6 +143,9 @@ function posterCard(m, extraTag = "") {
     ? `<button class="btn-sm btn-wishlisted" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
     : `<button class="btn-sm btn-wishlist"   onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆</button>`
 
+  const ignoreBtn = `<button class="btn-sm btn-ignore" title="Don't want this"
+    onclick="event.stopPropagation();ignoreMovie(${tmdb},'${safeName}',${m.year||"null"},'${m.poster||""}',this)">🚫</button>`
+
   const rating = parseFloat(m.rating || 0).toFixed(1)
 
   const imgHtml = m.poster
@@ -168,7 +171,7 @@ function posterCard(m, extraTag = "") {
     </div>
     <div class="pc-overlay">
       <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
-      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}</div>
+      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${ignoreBtn}</div>
     </div>
   </div>`
 }
@@ -225,6 +228,24 @@ async function removeWishlist(tmdb, btn){
   btn.textContent = "☆ Wishlist"
   btn.onclick     = () => addWishlist(tmdb,btn)
   toast("Removed from Wishlist")
+}
+
+async function ignoreMovie(tmdb, title, year, poster, btn) {
+  btn.disabled = true
+  const res = await api("/api/ignore", "POST", { kind: "movie", value: tmdb, title, year, poster })
+  if (res.ok) {
+    toast(`"${title}" hidden — won't appear again`, "success")
+    const card = btn.closest(".pc")
+    if (card) {
+      card.style.transition = "opacity .3s, transform .3s"
+      card.style.opacity = "0"
+      card.style.transform = "scale(.95)"
+      setTimeout(() => card.remove(), 320)
+    }
+  } else {
+    btn.disabled = false
+    toast(`Could not ignore: ${res.error || "unknown error"}`, "error")
+  }
 }
 
 async function addToRadarr(tmdb, title, btn){
@@ -731,9 +752,269 @@ function renderSuggestions(){
 function renderWishlist(){
   const c    = document.getElementById("content")
   const list = applyFilters(DATA.wishlist||[])
-  if (!list.length){ c.innerHTML=emptyStateHTML("Wishlist is empty"); return }
+
+  if (!list.length){
+    c.innerHTML = emptyStateHTML("Wishlist is empty")
+    return
+  }
   const { slice, btn } = _paginate(list, "wishlist")
   c.innerHTML = `<div class="grid-posters">${slice.map(m=>posterCard(m)).join("")}</div>${btn}`
+}
+
+/* ── Letterboxd tab ──────────────────────────────────────── */
+
+function _lbUrlManager(savedUrls, moviesRes) {
+  const urlList = savedUrls.length
+    ? savedUrls.map(u => {
+        const safe   = escHtml(u)
+        const safeJs = u.replace(/\\/g,"\\\\").replace(/'/g,"\\'")
+        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--border)">
+          <span style="flex:1;font-size:.75rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;
+                       white-space:nowrap" title="${safe}">${safe}</span>
+          <button onclick="removeLbUrl('${safeJs}',this)"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:.85rem;
+                   padding:2px 6px;flex-shrink:0" title="Remove">✕</button>
+        </div>`
+      }).join("")
+    : `<p style="color:var(--text3);font-size:.75rem;padding:.4rem 0">No lists added yet</p>`
+
+  const count = moviesRes?.movies?.length || 0
+  const owned = moviesRes?.owned_count   || 0
+  const stats = count
+    ? `<span style="color:var(--text3);font-size:.72rem">${count} movies${owned ? ` · ${owned} already owned hidden` : ""}</span>`
+    : ""
+
+  return `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+                padding:1rem 1.2rem;margin-bottom:1.5rem">
+      <div style="font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+                  color:var(--text3);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
+        Letterboxd Lists
+        ${stats}
+        <button onclick="renderLetterboxd()"
+          style="margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;
+                 font-size:.85rem;padding:2px 6px;flex-shrink:0;line-height:1" title="Refresh">↻</button>
+      </div>
+      <div style="margin-bottom:.75rem">${urlList}</div>
+      <div style="display:flex;flex-direction:column;gap:.35rem">
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input id="lbUrlInput" type="url"
+            placeholder="e.g. letterboxd.com/you/watchlist/ or /list/my-list/"
+            style="flex:1;min-width:0;padding:6px 10px;border-radius:7px;border:1px solid var(--border2);
+                   background:var(--bg3);color:var(--text);font-size:.78rem;font-family:'DM Mono',monospace"
+            onkeydown="if(event.key==='Enter')addLbUrl(this)"/>
+          <button onclick="addLbUrl(document.getElementById('lbUrlInput'))"
+            style="white-space:nowrap;padding:6px 14px;border-radius:7px;border:1px solid var(--border2);
+                   background:var(--bg3);color:var(--text2);cursor:pointer;font-size:.75rem;
+                   font-family:'DM Mono',monospace;flex-shrink:0">
+            + Add
+          </button>
+        </div>
+        <p style="color:var(--text3);font-size:.7rem;margin:0">
+          Supports watchlists, named lists, diary feeds and profile RSS.
+          E.g. <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/watchlist/</code> ·
+          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/list/best-of-2024/</code> ·
+          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/rss/</code>.
+          Profile RSS feeds from curators are auto-expanded into their individual lists.
+          All lists must be public.
+        </p>
+      </div>
+    </div>`
+}
+
+async function renderLetterboxd() {
+  const c = document.getElementById("content")
+  c.innerHTML = `<p style="color:var(--text3);font-size:.78rem">Loading…</p>`
+
+  let urlsRes, moviesRes
+  try {
+    [urlsRes, moviesRes] = await Promise.all([
+      api("/api/letterboxd/urls"),
+      api("/api/letterboxd/movies"),
+    ])
+  } catch(e) {
+    c.innerHTML = emptyStateHTML("Failed to load Letterboxd data")
+    return
+  }
+
+  const savedUrls = urlsRes.urls || []
+
+  // If server returned an error (e.g. TMDB not configured), show it
+  if (!moviesRes.ok) {
+    const urlManager2 = _lbUrlManager(savedUrls)
+    c.innerHTML = urlManager2 + emptyStateHTML(moviesRes.error || "Failed to load movies")
+    return
+  }
+
+  const movies = moviesRes.movies || []
+
+  // ── URL manager ─────────────────────────────────────────
+  const urlManager = _lbUrlManager(savedUrls, moviesRes)
+
+  if (!movies.length) {
+    const hint = moviesRes.unique > 0
+      ? `Found ${moviesRes.unique} movie IDs in RSS but TMDB enrichment returned nothing — check your TMDB API key`
+      : savedUrls.length
+        ? "No movies found — make sure the list is public and is a watchlist or named list (not a profile page)"
+        : "Add a Letterboxd list above to get started"
+    c.innerHTML = urlManager + emptyStateHTML(hint)
+    return
+  }
+
+  const maxScore = movies[0]?.score || 1
+  const { slice, btn } = _paginate(movies, "letterboxd")
+  c.innerHTML = urlManager +
+    (maxScore > 1
+      ? `<p style="color:var(--text3);font-size:.75rem;margin-bottom:1rem">
+           Gold badge = appears in multiple lists · sorted by frequency then rating</p>`
+      : "") +
+    `<div class="grid-posters">${slice.map(m => lbPosterCard(m)).join("")}</div>${btn}`
+}
+
+function lbPosterCard(m) {
+  const tmdb     = m.tmdb
+  const safeName = (m.title || "").replace(/'/g, "\\'").replace(/"/g, "&quot;")
+  const score    = m.score || 1
+
+  const scoreBadge = score > 1
+    ? `<div style="position:absolute;top:6px;right:6px;background:var(--gold);color:#000;
+                   font-size:.62rem;font-weight:700;font-family:'Syne',sans-serif;
+                   border-radius:5px;padding:2px 7px;z-index:2;line-height:1.5;
+                   box-shadow:0 1px 4px rgba(0,0,0,.4)">×${score}</div>`
+    : ""
+
+  const wBtn = m.wishlist
+    ? `<button class="btn-sm btn-wishlisted" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
+    : `<button class="btn-sm btn-wishlist"   onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆ Wishlist</button>`
+
+  const radarrBtn = CONFIG?.RADARR?.RADARR_ENABLED
+    ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`
+    : ""
+
+  const rating  = parseFloat(m.rating || 0).toFixed(1)
+  const imgHtml = m.poster
+    ? `<img class="pc-img" src="${m.poster}" loading="lazy" alt=""/>`
+    : `<div class="pc-no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 2v20M17 2v20M2 12h20"/></svg><span>No Image</span></div>`
+
+  const mSafe = JSON.stringify({ tmdb: m.tmdb, title: m.title, year: m.year, poster: m.poster, wishlist: m.wishlist })
+    .replace(/'/g, "\\'")
+
+  return `
+  <div class="pc" style="position:relative"
+    onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
+    ${scoreBadge}
+    <input type="checkbox" class="pc-check"
+      onclick="event.stopPropagation();toggleSelect(${tmdb},${mSafe.replace(/"/g,'&quot;')},this)"
+      title="Select"/>
+    ${imgHtml}
+    <div class="pc-info">
+      <div class="pc-title" title="${escHtml(m.title||"")}">${escHtml(m.title||"Untitled")}</div>
+      <div class="pc-meta">
+        <span class="pc-rating">⭐ ${rating}</span>
+        ${m.year ? `<span>${m.year}</span>` : ""}
+      </div>
+    </div>
+    <div class="pc-overlay">
+      <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
+      <div class="pc-overlay-actions">${wBtn}${radarrBtn}</div>
+    </div>
+  </div>`
+}
+
+async function addLbUrl(input) {
+  const url = (input?.value || "").trim()
+  if (!url) { toast("Paste a Letterboxd URL first", "error"); return }
+
+  const btn = input?.nextElementSibling
+  if (btn) { btn.disabled = true; btn.textContent = "…" }
+
+  try {
+    const res = await api("/api/letterboxd/urls", "POST", { url })
+    if (res.ok) {
+      input.value = ""
+      toast("List added — refreshing…", "gold")
+      await renderLetterboxd()
+    } else {
+      toast(res.error || "Failed to add URL", "error")
+      if (btn) { btn.disabled = false; btn.textContent = "+ Add" }
+    }
+  } catch(e) {
+    toast("Failed to add URL", "error")
+    if (btn) { btn.disabled = false; btn.textContent = "+ Add" }
+  }
+}
+
+async function removeLbUrl(url, btn) {
+  btn.disabled = true
+  try {
+    await api("/api/letterboxd/urls/remove", "POST", { url })
+    toast("List removed", "gold")
+    await renderLetterboxd()
+  } catch(e) {
+    toast(`Failed to remove: ${e?.message || "unknown error"}`, "error")
+    btn.disabled = false
+  }
+}
+
+/* ── Ignored ─────────────────────────────────────────────── */
+
+async function renderIgnored(){
+  const c = document.getElementById("content")
+  c.innerHTML = `<p style="color:var(--text3);font-size:.78rem">Loading…</p>`
+
+  const res = await api("/api/ignored")
+  if (!res.ok) { c.innerHTML = emptyStateHTML("Could not load ignored list"); return }
+
+  const movies = res.movies || []
+  if (!movies.length) {
+    c.innerHTML = emptyStateHTML("No ignored movies — click 🚫 on any card to hide it permanently")
+    return
+  }
+
+  c.innerHTML = `
+    <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">
+      ${movies.length} ignored movie${movies.length!==1?"s":""} — these will never appear in Missing, Classics or Suggestions.
+    </p>
+    <div class="grid-posters">
+      ${movies.map(m => {
+        const safeName = (m.title||"").replace(/'/g,"\\'").replace(/"/g,"&quot;")
+        const imgHtml  = m.poster
+          ? `<img class="pc-img" src="${m.poster}" loading="lazy" alt=""/>`
+          : `<div class="pc-no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 2v20M17 2v20M2 12h20"/></svg><span>No Image</span></div>`
+        return `
+          <div class="pc" id="ignored-${m.tmdb}">
+            ${imgHtml}
+            <div class="pc-info">
+              <div class="pc-title" title="${escHtml(m.title||"")}">${escHtml(m.title||"Untitled")}</div>
+              <div class="pc-meta">${m.year?`<span>${m.year}</span>`:""}</div>
+            </div>
+            <div class="pc-overlay">
+              <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
+              <div class="pc-overlay-actions">
+                <button class="btn-sm" onclick="unignoreMovie(${m.tmdb},'${safeName}',this)"
+                  style="color:var(--green)">↩ Restore</button>
+              </div>
+            </div>
+          </div>`
+      }).join("")}
+    </div>`
+}
+
+async function unignoreMovie(tmdb, title, btn) {
+  btn.disabled = true
+  const res = await api("/api/unignore", "POST", { kind: "movie", value: tmdb })
+  if (res.ok) {
+    toast(`"${title}" restored`, "success")
+    const card = document.getElementById(`ignored-${tmdb}`)
+    if (card) {
+      card.style.transition = "opacity .3s"
+      card.style.opacity    = "0"
+      setTimeout(() => { card.remove() }, 320)
+    }
+  } else {
+    btn.disabled = false
+    toast(`Could not restore: ${res.error || "unknown error"}`, "error")
+  }
 }
 
 /* ── No TMDB GUID ────────────────────────────────────────── */
@@ -888,6 +1169,6 @@ async function copyLetterboxdToClipboard() {
 function updateExportBtn() {
   const btn  = document.getElementById("exportBtn")
   const cbtn = document.getElementById("clipboardBtn")
-  if (btn)  btn.style.display  = EXPORT_TABS.has(ACTIVE_TAB) ? "" : "none"
-  if (cbtn) cbtn.style.display = EXPORT_TABS.has(ACTIVE_TAB) ? "" : "none"
+  if (btn)  btn.style.display  = EXPORT_TABS.has(ACTIVE_TAB) ? "inline-block" : "none"
+  if (cbtn) cbtn.style.display = EXPORT_TABS.has(ACTIVE_TAB) ? "inline-block" : "none"
 }

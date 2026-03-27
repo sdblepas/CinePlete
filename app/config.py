@@ -96,6 +96,9 @@ DEFAULT_CONFIG = {
         "WATCHTOWER_URL": "",
         "WATCHTOWER_API_TOKEN": "",
     },
+    "FLARESOLVERR": {
+        "FLARESOLVERR_URL": "",   # e.g. http://flaresolverr:8191
+    },
     "AUTH": {
         # "None" | "Forms" | "DisabledForLocalAddresses"
         "AUTH_METHOD": "None",

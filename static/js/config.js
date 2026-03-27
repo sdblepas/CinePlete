@@ -143,8 +143,9 @@ function renderConfig(){
   const ovs   = cfg.OVERSEERR   ||{}
   const jss   = cfg.JELLYSEERR  ||{}
   const wh    = cfg.WEBHOOK     ||{}
-  const wtch  = cfg.WATCHTOWER  ||{}
-  const auth  = cfg.AUTH        ||{}
+  const wtch  = cfg.WATCHTOWER   ||{}
+  const auth  = cfg.AUTH         ||{}
+  const fsolv = cfg.FLARESOLVERR ||{}
 
   const mediaServer = (srv.MEDIA_SERVER || "plex").toLowerCase()
 
@@ -363,6 +364,12 @@ function renderConfig(){
         <span id="wtchStatus" style="font-size:.72rem;color:var(--text3);margin-left:.5rem"></span>
       </div>
 
+      <div class="form-section">
+        ${sec('FlareSolverr <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
+        ${field("cfg_flaresolverr_url", "FlareSolverr URL", fsolv.FLARESOLVERR_URL||"")}
+        ${hint("e.g. http://flaresolverr:8191 — used to bypass Cloudflare when fetching Letterboxd lists.")}
+      </div>
+
       <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
       <div id="cfgStatus" style="font-size:.75rem;color:var(--text3);margin-top:.6rem;text-align:center"></div>
     </div>
@@ -459,6 +466,9 @@ async function saveConfig(){
       AUTH_METHOD:   v("cfg_auth_method"),
       AUTH_USERNAME: v("cfg_auth_username"),
       AUTH_PASSWORD: v("cfg_auth_password"),  // virtual — backend hashes and stores
+    },
+    FLARESOLVERR:{
+      FLARESOLVERR_URL: v("cfg_flaresolverr_url"),
     },
   }
 

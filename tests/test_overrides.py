@@ -151,7 +151,7 @@ class TestDefaultKeys:
 
     def test_all_default_keys_present(self):
         expected = {
-            "ignore_movies", "ignore_franchises", "ignore_directors",
-            "ignore_actors", "wishlist_movies", "rec_fetched_ids"
+            "ignore_movies", "ignore_movies_meta", "ignore_franchises", "ignore_directors",
+            "ignore_actors", "wishlist_movies", "rec_fetched_ids", "letterboxd_urls"
         }
         assert expected == set(DEFAULT.keys())
