@@ -507,24 +507,68 @@ def _tmdb_search(api_key: str, title: str, year=None) -> int | None:
         return None
 
 
-def _fetch_letterboxd_rss(url: str, _depth: int = 0) -> list[dict]:
+def _fetch_via_flaresolverr(rss_url: str, flaresolverr_url: str) -> bytes | None:
+    """
+    Route a request through FlareSolverr to bypass Cloudflare.
+    Returns raw response bytes on success, None on failure.
+    """
+    base = flaresolverr_url.rstrip("/")
+    try:
+        resp = requests.post(
+            f"{base}/v1",
+            json={"cmd": "request.get", "url": rss_url, "maxTimeout": 60000},
+            headers={"Content-Type": "application/json"},
+            timeout=70,
+        )
+        data = resp.json()
+        if data.get("status") == "ok":
+            content = data.get("solution", {}).get("response", "")
+            return content.encode("utf-8") if isinstance(content, str) else content
+    except Exception as e:
+        log.debug(f"FlareSolverr error for {rss_url}: {e}")
+    return None
+
+
+def _parse_films_from_html(html_text: str) -> list[dict]:
+    """
+    Extract film titles from the HTML description in a Letterboxd lists-feed
+    item.  Matches: <a href="https://letterboxd.com/film/slug/">Title</a>
+    Used as fallback when the list RSS itself is blocked (403/404).
+    """
+    import re
+    skip = {"View the full list on Letterboxd", "here", "letterboxd.com"}
+    pattern = re.compile(
+        r'href="https://letterboxd\.com/film/([^/"]+)/"[^>]*>([^<]{1,120})</a>',
+        re.IGNORECASE,
+    )
+    seen: set = set()
+    results = []
+    for m in pattern.finditer(html_text):
+        title = m.group(2).strip()
+        slug  = m.group(1)
+        if title and title not in skip and slug not in seen:
+            seen.add(slug)
+            results.append({"title": title})
+    return results
+
+
+def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> list[dict]:
     """
     Fetch movies from a Letterboxd RSS feed.
 
     Accepts any public Letterboxd URL and derives the RSS endpoint:
       /username/watchlist/      → /username/watchlist/rss/
       /username/list/my-list/   → /username/list/my-list/rss/
-      /username/rss/            → used as-is (diary or lists feed)
-      /username/films/          → /username/rss/ (no dedicated films RSS)
+      /username/rss/            → used as-is (diary or curator lists feed)
+      /username/films/          → /username/rss/ (no /films/rss/ endpoint)
 
-    Element matching is namespace-agnostic (local name only) to handle
-    variations in the Letterboxd tmdb/letterboxd namespace URI declarations.
+    Element matching is namespace-agnostic (local name only).
 
-    Auto-expansion: if the RSS is a "lists feed" (items link to /list/ pages
-    rather than films with tmdb:movieId / letterboxd:filmTitle), each linked
-    list's own RSS is fetched automatically (one level deep, max 10 lists).
-    This handles curator accounts like mscorsese whose /rss/ feed is a
-    directory of their curated lists rather than a personal diary.
+    Auto-expansion for curator accounts: if the RSS is a "lists feed" (items
+    link to /list/ pages with no filmTitle/movieId), each linked list's RSS is
+    fetched (one level deep, max 10 lists). When a list RSS is blocked (403),
+    FlareSolverr is tried if configured; otherwise titles are extracted from
+    the item's description HTML as a partial fallback.
     """
     import xml.etree.ElementTree as ET
 
@@ -533,12 +577,14 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0) -> list[dict]:
     if path.endswith("/rss"):
         rss_url = url.rstrip("/") + "/"
     elif path.endswith("/films"):
-        # No /films/rss/ endpoint — fall back to the user's diary RSS
+        # No /films/rss/ — fall back to the user's diary RSS
         username = path.lstrip("/").split("/")[0]
         rss_url = f"https://letterboxd.com/{username}/rss/"
     else:
         rss_url = url.rstrip("/") + "/rss/"
 
+    # Try direct fetch first; on Cloudflare block (403) try FlareSolverr
+    content: bytes | None = None
     try:
         resp = requests.get(
             rss_url,
@@ -546,14 +592,20 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0) -> list[dict]:
             timeout=15,
             allow_redirects=True,
         )
+        if resp.status_code == 200:
+            content = resp.content
+        elif resp.status_code == 403 and flaresolverr:
+            log.debug(f"Letterboxd: 403 on {rss_url}, retrying via FlareSolverr")
+            content = _fetch_via_flaresolverr(rss_url, flaresolverr)
     except requests.exceptions.RequestException:
-        return []
+        if flaresolverr:
+            content = _fetch_via_flaresolverr(rss_url, flaresolverr)
 
-    if resp.status_code != 200:
+    if not content:
         return []
 
     try:
-        root = ET.fromstring(resp.content)
+        root = ET.fromstring(content)
     except ET.ParseError:
         return []
 
@@ -561,46 +613,60 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0) -> list[dict]:
     def local(tag: str) -> str:
         return tag.split("}")[-1] if "}" in tag else tag
 
-    movies: list[dict]   = []
-    list_links: list[str] = []   # collected when items are lists, not films
+    movies: list[dict] = []
+    # list_links: (url, description_html) for curator-style list feeds
+    list_links: list[tuple[str, str]] = []
 
     for item in root.findall(".//item"):
         tmdb_id = title = year = None
         item_link: str | None = None
+        item_desc: str        = ""
 
         for child in item:
             lname = local(child.tag)
             text  = (child.text or "").strip()
-            if not text:
-                continue
-            if lname == "movieId":
+            if lname == "movieId" and text:
                 try:
                     tmdb_id = int(text)
                 except (ValueError, TypeError):
                     pass
-            elif lname == "filmTitle":
+            elif lname == "filmTitle" and text:
                 title = text
-            elif lname == "filmYear":
+            elif lname == "filmYear" and text:
                 try:
                     year = int(text)
                 except ValueError:
                     pass
-            elif lname == "link" and "/list/" in text:
+            elif lname == "link" and text and "/list/" in text:
                 item_link = text
+            elif lname == "description" and text:
+                item_desc = text
 
         if tmdb_id:
             movies.append({"tmdb_id": tmdb_id})
         elif title:
             movies.append({"title": title, "year": year})
         elif item_link:
-            list_links.append(item_link)
+            list_links.append((item_link, item_desc))
 
-    # If no film entries found but list links were collected (e.g. a curator's
-    # profile RSS), recursively fetch each linked list — one level deep only.
+    # If this is a curator's lists-feed (no film entries, only list links),
+    # try each list's RSS; fall back to parsing description HTML on 403/404.
     if not movies and list_links and _depth == 0:
-        log.debug(f"Letterboxd: lists feed detected at {rss_url}, expanding {len(list_links)} lists")
-        for list_url in list_links[:10]:
-            movies.extend(_fetch_letterboxd_rss(list_url, _depth=1))
+        log.debug(
+            f"Letterboxd: lists feed at {rss_url} — expanding {len(list_links)} lists"
+        )
+        for list_url, desc_html in list_links[:10]:
+            child_movies = _fetch_letterboxd_rss(list_url, _depth=1, flaresolverr=flaresolverr)
+            if child_movies:
+                movies.extend(child_movies)
+            elif desc_html:
+                # List RSS blocked — salvage titles from description HTML
+                fallback = _parse_films_from_html(desc_html)
+                log.debug(
+                    f"Letterboxd: list RSS blocked for {list_url}, "
+                    f"extracted {len(fallback)} titles from description"
+                )
+                movies.extend(fallback)
 
     return movies
 
@@ -625,10 +691,11 @@ def import_watchlist(payload: dict = Body(...)):
     if "letterboxd.com" not in host:
         return {"ok": False, "error": "Only Letterboxd URLs are supported"}
 
-    cfg     = load_config()
-    api_key = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+    cfg          = load_config()
+    api_key      = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+    flaresolverr = cfg.get("FLARESOLVERR", {}).get("FLARESOLVERR_URL", "").rstrip("/")
 
-    raw = _fetch_letterboxd_rss(url)
+    raw = _fetch_letterboxd_rss(url, flaresolverr=flaresolverr)
     if not raw:
         return {"ok": False, "error": "No movies found — check the URL is a public Letterboxd list or watchlist"}
 
@@ -714,8 +781,9 @@ def letterboxd_get_movies():
     from app.tmdb import TMDB
     from collections import Counter
 
-    cfg = load_config()
-    api_key = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+    cfg             = load_config()
+    api_key         = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+    flaresolverr    = cfg.get("FLARESOLVERR", {}).get("FLARESOLVERR_URL", "").rstrip("/")
     if not api_key:
         return {"ok": False, "error": "TMDB API key not configured"}
 
@@ -725,10 +793,12 @@ def letterboxd_get_movies():
         return {"ok": True, "movies": [], "urls": []}
 
     counts: Counter = Counter()   # tmdb_id (int) → appearance count
+    url_status: list[dict] = []   # per-URL fetch results for UI feedback
 
     for lb_url in urls:
-        raw = _fetch_letterboxd_rss(lb_url)
+        raw = _fetch_letterboxd_rss(lb_url, flaresolverr=flaresolverr)
         seen_this_url: set = set()
+        resolved = 0
         for item in raw:
             tmdb_id = item.get("tmdb_id")
             if not tmdb_id and item.get("title"):
@@ -736,9 +806,15 @@ def letterboxd_get_movies():
             if tmdb_id and tmdb_id not in seen_this_url:
                 counts[tmdb_id] += 1
                 seen_this_url.add(tmdb_id)
+                resolved += 1
+        url_status.append({
+            "url":      lb_url,
+            "raw":      len(raw),
+            "resolved": resolved,
+        })
 
     if not counts:
-        return {"ok": True, "movies": [], "urls": urls}
+        return {"ok": True, "movies": [], "urls": urls, "url_status": url_status}
 
     t        = TMDB(api_key)
     wishlist = set(ov.get("wishlist_movies", []))
