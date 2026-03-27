@@ -1,5 +1,6 @@
 import copy
 import os
+from collections import Counter
 from datetime import datetime
 import json
 import requests
@@ -11,7 +12,8 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse, Red
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import load_config, save_config, is_configured
-from app.scanner import build, build_async, scan_state
+from app.scanner import build, build_async, scan_state, load_snapshot
+from app.tmdb import TMDB
 from app.overrides import load_json, save_json, add_unique, remove_value
 from app.logger import get_logger
 from app import scheduler
@@ -444,6 +446,8 @@ def api_unignore(payload: dict = Body(...)):
         remove_value(ov["ignore_directors"], str(value))
     elif kind == "actor":
         remove_value(ov["ignore_actors"], str(value))
+    else:
+        return {"ok": False, "error": f"Unknown kind: {kind}"}
 
     save_json(OVERRIDES_FILE, ov)
     return {"ok": True}
@@ -778,9 +782,6 @@ def letterboxd_get_movies():
     movie by how many lists it appears in, enrich with TMDB metadata, and
     return sorted by score desc (ties broken by TMDB rating).
     """
-    from app.tmdb import TMDB
-    from collections import Counter
-
     cfg             = load_config()
     api_key         = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
     flaresolverr    = cfg.get("FLARESOLVERR", {}).get("FLARESOLVERR_URL", "").rstrip("/")
@@ -816,7 +817,6 @@ def letterboxd_get_movies():
     if not counts:
         return {"ok": True, "movies": [], "urls": urls, "url_status": url_status}
 
-    from app.scanner import load_snapshot
     t        = TMDB(api_key)
     wishlist = set(ov.get("wishlist_movies", []))
     ignored  = set(ov.get("ignore_movies", []))

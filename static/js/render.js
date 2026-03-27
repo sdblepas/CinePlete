@@ -951,7 +951,7 @@ async function removeLbUrl(url, btn) {
     toast("List removed", "gold")
     await renderLetterboxd()
   } catch(e) {
-    toast("Failed to remove", "error")
+    toast(`Failed to remove: ${e?.message || "unknown error"}`, "error")
     btn.disabled = false
   }
 }
