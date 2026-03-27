@@ -286,3 +286,9 @@ The `field()` helper in `config.js` renders a `type="password"` input with a sho
 - **Multiple library support** — currently only one Plex/Jellyfin movie library can be scanned at a time. Users with separate libraries (e.g. 4K + 1080p, or Movies + Anime) need to reconfigure to switch. Future work: allow selecting or scanning multiple libraries and merging results.
 
 - ~~**Letterboxd tab: background fetch + caching**~~ ✅ fixed — `data/letterboxd_cache.json`, background thread via `_lb_do_refresh()`, instant GET, auto-refresh on add/remove URL, JS polls every 5s, shows "Updated Xm ago" / "↻ Refreshing…".
+
+- **Bulk actions** — No way to select multiple movies and act on them at once. Every tab should support a multi-select mode with "Add all to Radarr", "Add all to Wishlist", and "Ignore all" batch actions.
+
+- **Wishlist → Radarr sync status** — After sending a movie to Radarr there is no feedback on whether Radarr has it, is searching, or has downloaded it. The wishlist should show a status badge per movie: queued / downloading / available / missing.
+
+- **Notifications for Radarr grabs** — "Radarr downloaded X from your wishlist" — closes the loop between discovery and acquisition. Telegram/webhook notification when a wishlist movie is grabbed by Radarr.
