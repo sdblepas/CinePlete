@@ -67,6 +67,7 @@ DEFAULT_CONFIG = {
         "RADARR_QUALITY_PROFILE_ID": 6,
         "RADARR_MONITORED": True,
         "RADARR_SEARCH_ON_ADD": False,
+        "RADARR_GRAB_POLL_INTERVAL": 5,   # minutes between Radarr grab history polls (0 = disabled)
     },
     "RADARR_4K": {
         "RADARR_4K_ENABLED": False,

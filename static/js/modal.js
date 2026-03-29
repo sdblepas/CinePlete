@@ -2,7 +2,8 @@
    modal.js — movie detail modal
 ============================================================ */
 
-let _modalOpen = false
+let _modalOpen  = false
+let _modalMovie = null   // current modal's movie data — used by wishlist handlers to update DATA
 
 async function openMovieModal(tmdb, fallback = {}) {
   const modal   = document.getElementById("movieModal")
@@ -120,6 +121,15 @@ async function openMovieModal(tmdb, fallback = {}) {
     ? `<button class="btn-sm btn-trailer" onclick="toggleModalTrailer('${md.trailer_key}')">▶ Trailer</button>`
     : ""
 
+  // Stash movie data so wishlist handlers can update DATA without an extra API call
+  _modalMovie = {
+    tmdb,
+    title:  md.title  || fallback.title  || "",
+    year:   md.year   || fallback.year   || null,
+    poster: md.poster || fallback.poster || "",
+    rating: md.rating || fallback.rating || 0,
+  }
+
   const wInWishlist = fallback.wishlist
   const wBtn = wInWishlist
     ? `<button class="btn-sm btn-wishlisted" id="modal-wbtn" onclick="modalRemoveWishlist(${tmdb})">★ Wishlisted</button>`
@@ -172,7 +182,8 @@ function toggleModalTrailer(key) {
 function closeMovieModal() {
   const modal = document.getElementById("movieModal")
   modal.classList.remove("open")
-  _modalOpen = false
+  _modalOpen  = false
+  _modalMovie = null
   document.body.style.overflow = ""
   // Stop any playing trailer immediately
   const frame = document.getElementById("trailerFrame")
@@ -200,6 +211,13 @@ async function modalAddWishlist(tmdb) {
     btn.onclick     = () => modalRemoveWishlist(tmdb)
   }
   toast("Added to Wishlist", "gold")
+  // Reflect in DATA so Wishlist tab shows the movie without rescan
+  if (_modalMovie?.tmdb) {
+    if (!DATA.wishlist) DATA.wishlist = []
+    if (!DATA.wishlist.find(w => w.tmdb === tmdb))
+      DATA.wishlist.push({ ..._modalMovie, wishlist: true })
+  }
+  updateBadges()
 }
 
 async function modalRemoveWishlist(tmdb) {
@@ -211,4 +229,7 @@ async function modalRemoveWishlist(tmdb) {
     btn.onclick     = () => modalAddWishlist(tmdb)
   }
   toast("Removed from Wishlist")
+  // Reflect in DATA immediately
+  DATA.wishlist = (DATA.wishlist || []).filter(w => w.tmdb !== tmdb)
+  updateBadges()
 }

@@ -1183,11 +1183,12 @@
   <!-- BATCH ACTION BAR -->
   <div id="batchBar">
     <span id="batchCount">0 selected</span>
-    <button class="btn-sm btn-radarr"     onclick="batchAddToRadarr()"     id="batchRadarr">+ Radarr</button>
-    <button class="btn-sm btn-overseerr"  onclick="batchAddToOverseerr()"  id="batchOverseerr" style="display:none">→ Overseerr</button>
-    <button class="btn-sm btn-jellyseerr" onclick="batchAddToJellyseerr()" id="batchJellyseerr" style="display:none">→ Jellyseerr</button>
-    <button class="btn-sm btn-wishlist"   onclick="batchAddToWishlist()">☆ Wishlist</button>
-    <button class="btn-sm btn-ignore"     onclick="clearSelection()">✕ Clear</button>
+    <button class="btn-sm btn-radarr"     onclick="batchAddToRadarr()"          id="batchRadarr">+ Radarr</button>
+    <button class="btn-sm btn-overseerr"  onclick="batchAddToOverseerr()"       id="batchOverseerr"  style="display:none">→ Overseerr</button>
+    <button class="btn-sm btn-jellyseerr" onclick="batchAddToJellyseerr()"      id="batchJellyseerr" style="display:none">→ Jellyseerr</button>
+    <button class="btn-sm btn-wishlist"   onclick="batchWishlistAction()"       id="batchWishlist">☆ Wishlist</button>
+    <button class="btn-sm btn-ignore"     onclick="batchIgnoreMovies()"         id="batchIgnore">🚫 Ignore all</button>
+    <button class="btn-sm"                onclick="clearSelection()" style="background:var(--bg2);color:var(--text2)">✕ Clear</button>
   </div>
 
   <!-- GLOBAL SEARCH MODAL -->

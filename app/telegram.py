@@ -19,6 +19,22 @@ DATA_DIR   = "/data"
 STAMP_FILE = f"{DATA_DIR}/last_telegram.txt"
 
 
+def _send(token: str, chat_id: str, text: str) -> bool:
+    """Raw Telegram sendMessage. Returns True on success."""
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            return True
+        log.warning(f"Telegram API error {r.status_code}: {r.text[:200]}")
+    except Exception as e:
+        log.error(f"Telegram send failed: {e}")
+    return False
+
+
 def _last_sent() -> float:
     """Return timestamp of last notification, or 0 if never sent."""
     try:
@@ -106,16 +122,25 @@ def send_scan_summary(results: dict, duration_s: int | None = None):
 
     text = "\n".join(lines)
 
-    try:
-        r = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
-            timeout=10,
-        )
-        if r.status_code == 200:
-            _save_sent()
-            log.info("Telegram scan summary sent")
-        else:
-            log.warning(f"Telegram API error {r.status_code}: {r.text[:200]}")
-    except Exception as e:
-        log.error(f"Telegram notification failed: {e}")
+    if _send(token, chat_id, text):
+        _save_sent()
+        log.info("Telegram scan summary sent")
+
+
+def send_radarr_grab(title: str, year: str | None = None) -> None:
+    """
+    Send a Telegram notification when Radarr grabs a wishlist movie.
+    Does NOT enforce TELEGRAM_MIN_INTERVAL — each grab is a discrete event.
+    """
+    cfg     = load_config()
+    tg      = cfg.get("TELEGRAM", {})
+    if not tg.get("TELEGRAM_ENABLED"):
+        return
+    token   = tg.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = tg.get("TELEGRAM_CHAT_ID",   "").strip()
+    if not token or not chat_id:
+        return
+    year_str = f" ({year})" if year else ""
+    text     = f"⬇️ *Radarr grabbed:* {title}{year_str}"
+    if _send(token, chat_id, text):
+        log.info(f"Telegram grab notification sent: {title}")

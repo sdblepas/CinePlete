@@ -1,5 +1,6 @@
 import copy
 import os
+import time
 from collections import Counter
 from datetime import datetime
 import json
@@ -988,6 +989,64 @@ def radarr_add(payload: dict = Body(...), instance: str = Query(default="primary
         return {"ok": False, "error": "Radarr disabled"}
     return _radarr_post(section, "RADARR", tmdb_id, title)
 
+
+
+# --------------------------------------------------
+# Radarr status (wishlist sync)
+# --------------------------------------------------
+
+_radarr_status_cache: dict = {"data": None, "ts": 0.0}
+
+
+@app.get("/api/radarr/status")
+def radarr_status():
+    """
+    Return a dict of tmdb_id → status for every movie in Radarr.
+    status values: "available" (has file), "monitored" (searching), "unmonitored".
+    Result is cached for 60 seconds to avoid hammering Radarr on every Wishlist render.
+    """
+    cfg    = load_config()
+    radarr = cfg.get("RADARR", {})
+    if not radarr.get("RADARR_ENABLED"):
+        return {"ok": False, "error": "Radarr disabled"}
+
+    now = time.time()
+    if _radarr_status_cache["data"] and now - _radarr_status_cache["ts"] < 60:
+        return _radarr_status_cache["data"]
+
+    url = radarr.get("RADARR_URL", "").rstrip("/")
+    key = radarr.get("RADARR_API_KEY", "")
+    if not url or not key:
+        return {"ok": False, "error": "Radarr not configured"}
+
+    try:
+        r = requests.get(
+            f"{url}/api/v3/movie",
+            headers={"X-Api-Key": key},
+            timeout=15,
+        )
+        r.raise_for_status()
+        movies = r.json()
+    except Exception as e:
+        log.debug(f"Radarr status fetch failed: {e}")
+        return {"ok": False, "error": "Could not reach Radarr"}
+
+    statuses: dict[int, str] = {}
+    for m in movies:
+        tmdb_id = m.get("tmdbId")
+        if not tmdb_id:
+            continue
+        if m.get("hasFile"):
+            statuses[tmdb_id] = "available"
+        elif m.get("monitored"):
+            statuses[tmdb_id] = "monitored"
+        else:
+            statuses[tmdb_id] = "unmonitored"
+
+    result = {"ok": True, "statuses": statuses}
+    _radarr_status_cache["data"] = result
+    _radarr_status_cache["ts"]   = now
+    return result
 
 
 # --------------------------------------------------

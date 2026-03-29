@@ -20,8 +20,11 @@ from app.logger import get_logger
 
 log = get_logger(__name__)
 
-DATA_DIR     = "/data"
-RESULTS_FILE = f"{DATA_DIR}/results.json"
+DATA_DIR        = "/data"
+RESULTS_FILE    = f"{DATA_DIR}/results.json"
+OVERRIDES_FILE  = f"{DATA_DIR}/overrides.json"
+GRAB_SEEN_FILE  = f"{DATA_DIR}/radarr_grab_seen.json"
+MAX_SEEN_IDS    = 500
 
 _scheduler = None
 
@@ -137,6 +140,108 @@ def _get_last_scan_count() -> int | None:
         return None
 
 
+def _load_seen_ids() -> set:
+    try:
+        with open(GRAB_SEEN_FILE, "r", encoding="utf-8") as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+
+def _save_seen_ids(ids: set) -> None:
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        # Keep only the most recent MAX_SEEN_IDS (Radarr IDs are monotonically increasing)
+        trimmed = sorted(ids)[-MAX_SEEN_IDS:]
+        with open(GRAB_SEEN_FILE, "w", encoding="utf-8") as f:
+            json.dump(trimmed, f)
+    except Exception as e:
+        log.warning(f"Could not save Radarr grab seen IDs: {e}")
+
+
+def _poll_radarr_grabs() -> None:
+    """
+    Poll Radarr's grab history and send a Telegram notification for every
+    wishlist movie that Radarr grabbed since the last check.
+
+    Uses /data/radarr_grab_seen.json to track which event IDs have already
+    triggered a notification. On first run the file is absent — we seed it
+    with all current grab event IDs and return without notifying (avoids a
+    flood of notifications for past grabs on first start).
+    """
+    import time
+    from app.telegram import send_radarr_grab
+
+    cfg    = load_config()
+    radarr = cfg.get("RADARR", {})
+    tg     = cfg.get("TELEGRAM", {})
+
+    if not radarr.get("RADARR_ENABLED") or not tg.get("TELEGRAM_ENABLED"):
+        return
+
+    url = radarr.get("RADARR_URL", "").rstrip("/")
+    key = radarr.get("RADARR_API_KEY", "")
+    if not url or not key:
+        return
+
+    # Load wishlist
+    try:
+        with open(OVERRIDES_FILE, "r", encoding="utf-8") as f:
+            ov = json.load(f)
+        wishlist: set = set(ov.get("wishlist_movies", []))
+    except Exception:
+        wishlist = set()
+
+    if not wishlist:
+        return
+
+    # Fetch recent grab history from Radarr
+    try:
+        r = requests.get(
+            f"{url}/api/v3/history",
+            headers={"X-Api-Key": key},
+            params={"eventType": "grabbed", "pageSize": 100,
+                    "sortKey": "date", "sortDir": "desc"},
+            timeout=15,
+        )
+        r.raise_for_status()
+        records = r.json().get("records", [])
+    except Exception as e:
+        log.debug(f"Radarr grab poll error: {e}")
+        return
+
+    seen_ids   = _load_seen_ids()
+    first_run  = not os.path.exists(GRAB_SEEN_FILE)
+
+    if first_run:
+        # Seed without notifying — avoids a blast on first start
+        for event in records:
+            seen_ids.add(event.get("id"))
+        _save_seen_ids(seen_ids)
+        log.info(f"Radarr grab poller: first run, seeded {len(seen_ids)} event IDs")
+        return
+
+    notified = 0
+    for event in records:
+        event_id = event.get("id")
+        if not event_id or event_id in seen_ids:
+            seen_ids.add(event_id)
+            continue
+        seen_ids.add(event_id)
+
+        tmdb_id = event.get("movie", {}).get("tmdbId")
+        if tmdb_id and tmdb_id in wishlist:
+            title = event.get("movie", {}).get("title", "Unknown")
+            year  = str(event.get("movie", {}).get("year", "")) or None
+            send_radarr_grab(title, year)
+            notified += 1
+            time.sleep(0.05)   # Telegram rate-limit safeguard
+
+    _save_seen_ids(seen_ids)
+    if notified:
+        log.info(f"Radarr grab poller: {notified} wishlist grab(s) notified")
+
+
 def _scheduled_scan():
     """Called by APScheduler for time-based auto-scans (daily/weekly)."""
     from app.scanner import build_async, scan_state
@@ -228,6 +333,20 @@ def start(interval_minutes: int):
             replace_existing=True,
         )
         log.info("Scheduled auto-scan: weekly on Sunday at 02:00")
+
+    # Radarr grab notifications (every 5 minutes when both Radarr + Telegram enabled)
+    radarr_poll = int(cfg.get("RADARR", {}).get("RADARR_GRAB_POLL_INTERVAL", 5))
+    if (radarr_poll > 0
+            and cfg.get("RADARR", {}).get("RADARR_ENABLED")
+            and cfg.get("TELEGRAM", {}).get("TELEGRAM_ENABLED")):
+        _scheduler.add_job(
+            _poll_radarr_grabs,
+            trigger="interval",
+            minutes=radarr_poll,
+            id="radarr_grab_poll",
+            replace_existing=True,
+        )
+        log.info(f"Radarr grab notifications: polling every {radarr_poll} minute(s)")
 
     _scheduler.start()
 
