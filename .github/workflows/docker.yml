@@ -118,7 +118,7 @@ jobs:
           echo "App failed to start" && docker logs cineplete-e2e && exit 1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
