@@ -103,6 +103,9 @@ async function batchRemoveFromWishlist() {
     // Remove card from DOM immediately
     document.querySelector(`.pc[data-tmdb="${tmdb}"]`)?.remove()
   }
+  // Keep DATA consistent so switching tabs doesn't restore the removed movies
+  const removedSet = new Set(_selected.keys())
+  DATA.wishlist = (DATA.wishlist || []).filter(w => !removedSet.has(w.tmdb))
   toast(`${n} movie${n !== 1 ? "s" : ""} removed from Wishlist`, "gold")
   clearSelection()
 }
@@ -298,6 +301,7 @@ async function addWishlist(tmdb, btn){
         DATA.wishlist.push({ ...m, wishlist: true })
     }
   } catch (_) {}
+  updateBadges()
 }
 
 async function removeWishlist(tmdb, btn){
@@ -308,6 +312,7 @@ async function removeWishlist(tmdb, btn){
   toast("Removed from Wishlist")
   // Remove from DATA immediately
   DATA.wishlist = (DATA.wishlist || []).filter(w => w.tmdb !== tmdb)
+  updateBadges()
 }
 
 async function ignoreMovie(tmdb, title, year, poster, btn) {

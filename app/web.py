@@ -1,5 +1,6 @@
 import copy
 import os
+import time
 from collections import Counter
 from datetime import datetime
 import json
@@ -1004,8 +1005,6 @@ def radarr_status():
     status values: "available" (has file), "monitored" (searching), "unmonitored".
     Result is cached for 60 seconds to avoid hammering Radarr on every Wishlist render.
     """
-    import time
-
     cfg    = load_config()
     radarr = cfg.get("RADARR", {})
     if not radarr.get("RADARR_ENABLED"):
@@ -1029,7 +1028,8 @@ def radarr_status():
         r.raise_for_status()
         movies = r.json()
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        log.debug(f"Radarr status fetch failed: {e}")
+        return {"ok": False, "error": "Could not reach Radarr"}
 
     statuses: dict[int, str] = {}
     for m in movies:
