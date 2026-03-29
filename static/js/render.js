@@ -292,8 +292,11 @@ async function addWishlist(tmdb, btn){
   // Reflect in DATA immediately so Wishlist tab shows the movie without rescan
   try {
     const m = JSON.parse(btn.dataset.movie || "{}")
-    if (m.tmdb && DATA.wishlist && !DATA.wishlist.find(w => w.tmdb === tmdb))
-      DATA.wishlist.push({ ...m, wishlist: true })
+    if (m.tmdb) {
+      if (!DATA.wishlist) DATA.wishlist = []
+      if (!DATA.wishlist.find(w => w.tmdb === tmdb))
+        DATA.wishlist.push({ ...m, wishlist: true })
+    }
   } catch (_) {}
 }
 
