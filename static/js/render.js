@@ -114,6 +114,7 @@ async function batchIgnoreMovies() {
       kind: "movie", value: tmdb,
       title: m.title, year: m.year, poster: m.poster,
     })
+    _purgeFromData(tmdb)
     document.querySelector(`.pc[data-tmdb="${tmdb}"]`)?.remove()
   }
   toast(`${n} movie${n !== 1 ? "s" : ""} ignored`, "gold")
@@ -133,10 +134,13 @@ async function batchAddToRadarr() {
 
 async function batchAddToWishlist() {
   const n = _selected.size
-  for (const [tmdb] of _selected) {
+  for (const [tmdb, m] of _selected) {
     await api("/api/wishlist/add", "POST", { tmdb })
+    if (!DATA.wishlist) DATA.wishlist = []
+    if (!DATA.wishlist.find(w => w.tmdb === tmdb))
+      DATA.wishlist.push({ ...m, wishlist: true })
   }
-  toast(`${n} movies added to Wishlist`, "gold")
+  toast(`${n} movie${n !== 1 ? "s" : ""} added to Wishlist`, "gold")
   clearSelection()
 }
 
@@ -181,9 +185,11 @@ function posterCard(m, extraTag = "") {
     ? `<button class="btn-sm btn-jellyseerr" onclick="event.stopPropagation();addToJellyseerr(${tmdb},'${safeName}',this)">→ JS</button>`
     : ""
 
+  // Encode movie data on the button so add/remove toggles can update DATA without extra API calls
+  const movieData = escHtml(JSON.stringify({tmdb:m.tmdb,title:m.title,year:m.year,poster:m.poster,rating:m.rating}))
   const wBtn = m.wishlist
-    ? `<button class="btn-sm btn-wishlisted" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
-    : `<button class="btn-sm btn-wishlist"   onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆</button>`
+    ? `<button class="btn-sm btn-wishlisted" data-movie="${movieData}" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
+    : `<button class="btn-sm btn-wishlist"   data-movie="${movieData}" onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆</button>`
 
   const ignoreBtn = `<button class="btn-sm btn-ignore" title="Don't want this"
     onclick="event.stopPropagation();ignoreMovie(${tmdb},'${safeName}',${m.year||"null"},'${m.poster||""}',this)">🚫</button>`
@@ -254,22 +260,51 @@ function movieCard(m, extraTag = ""){
   </div>`
 }
 
+/* ── In-memory DATA helpers ──────────────────────────────── */
+
+/**
+ * Remove a movie from every DATA array so tab re-renders reflect the change
+ * immediately without requiring a rescan.
+ */
+function _purgeFromData(tmdb) {
+  // Flat arrays
+  ;["classics","suggestions","wishlist"].forEach(key => {
+    if (Array.isArray(DATA[key]))
+      DATA[key] = DATA[key].filter(m => m.tmdb !== tmdb)
+  })
+  // Grouped arrays — remove from each group's .missing list
+  ;["franchises","directors","actors"].forEach(key => {
+    ;(DATA[key] || []).forEach(group => {
+      if (Array.isArray(group.missing))
+        group.missing = group.missing.filter(m => m.tmdb !== tmdb)
+    })
+  })
+}
+
 /* ── Wishlist / Radarr actions ───────────────────────────── */
 
 async function addWishlist(tmdb, btn){
   await api("/api/wishlist/add","POST",{tmdb})
   btn.className   = "btn-sm btn-wishlisted"
-  btn.textContent = "★ Wishlisted"
-  btn.onclick     = () => removeWishlist(tmdb,btn)
+  btn.textContent = "★"
+  btn.onclick     = () => removeWishlist(tmdb, btn)
   toast("Added to Wishlist","gold")
+  // Reflect in DATA immediately so Wishlist tab shows the movie without rescan
+  try {
+    const m = JSON.parse(btn.dataset.movie || "{}")
+    if (m.tmdb && DATA.wishlist && !DATA.wishlist.find(w => w.tmdb === tmdb))
+      DATA.wishlist.push({ ...m, wishlist: true })
+  } catch (_) {}
 }
 
 async function removeWishlist(tmdb, btn){
   await api("/api/wishlist/remove","POST",{tmdb})
   btn.className   = "btn-sm btn-wishlist"
-  btn.textContent = "☆ Wishlist"
-  btn.onclick     = () => addWishlist(tmdb,btn)
+  btn.textContent = "☆"
+  btn.onclick     = () => addWishlist(tmdb, btn)
   toast("Removed from Wishlist")
+  // Remove from DATA immediately
+  DATA.wishlist = (DATA.wishlist || []).filter(w => w.tmdb !== tmdb)
 }
 
 async function ignoreMovie(tmdb, title, year, poster, btn) {
@@ -277,6 +312,7 @@ async function ignoreMovie(tmdb, title, year, poster, btn) {
   const res = await api("/api/ignore", "POST", { kind: "movie", value: tmdb, title, year, poster })
   if (res.ok) {
     toast(`"${title}" hidden — won't appear again`, "success")
+    _purgeFromData(tmdb)   // keep DATA consistent so tab re-renders don't show it again
     const card = btn.closest(".pc")
     if (card) {
       card.style.transition = "opacity .3s, transform .3s"
