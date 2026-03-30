@@ -554,29 +554,61 @@ All persistent data lives in the mounted `/data` volume and survives container u
 ## Architecture
 
 ```
-Plex Server                  Jellyfin Server
-     │                              │
-     │ XML API (~2s/1000 movies)    │ HTTP API
-     ▼                              ▼
-Plex XML Scanner          Jellyfin API Scanner
-          \                    /
-           └──── scan_movies() ────┘
-                      │
-                      │ {tmdb_id: title}
-                      ▼
-     8-Step Scan Engine (background thread + progress state)
-                      │
-          ┌───────────┼───────────────┐
-          ▼           ▼               ▼
-     Franchises   Directors   Actors / Classics / Suggestions
-          │           │               │
-          └───────────┴───────────────┘
-                      │ TMDB API (cached)
-                      ▼
-              FastAPI Backend  ──→  results.json
-                      │
-                      ▼
-        Web UI Dashboard (charts, filters, wishlist, Radarr, logs)
+Plex Server                        Jellyfin Server
+     │                                    │
+     │ XML API (~2s/1000 movies)          │ HTTP REST API (paginated)
+     ▼                                    ▼
+ plex_xml.py                      jellyfin_api.py
+  (TMDB IDs, directors,           (TMDB IDs, directors,
+   actors, duplicates)             actors, top 5/film)
+          \                              /
+           └──────── scan_movies() ─────┘
+                           │
+                           ▼
+            8-Step Scan Engine — scanner.py (background thread)
+                           │
+     ┌─────────────────────┼──────────────────────┐
+     ▼                     ▼                       ▼
+ Franchises            Directors               Actors
+ (TMDB collections)    (person_credits)        (vote_count ≥ 500)
+     │                     │                       │
+     └─────────── TMDB API client — tmdb.py ───────┘
+                  (thread-safe, disk-cached,
+                   key-normalized, flush/50 calls)
+                           │
+     ┌─────────────────────┼──────────────────────┐
+     ▼                     ▼                       ▼
+  Classics             Suggestions             Scores
+ (Top Rated TMDB)    (recommendations        (franchise / directors /
+                      scored by library       classics / global)
+                      match count)
+                           │
+                           ▼
+                     results.json ◄──── overrides.json
+                     (/data volume)     (wishlist, ignores,
+                           │            letterboxd_urls,
+                           ▼            rec_fetched_ids)
+                   FastAPI — web.py
+                   (42 API endpoints)
+         ┌─────────────────┼──────────────────┐
+         ▼                 ▼                  ▼
+    Radarr / 4K      Overseerr /         Letterboxd
+    (add, status,    Jellyseerr          (RSS → TMDB,
+     grab poller)    (request)           multi-URL merge,
+         │                               FlareSolverr)
+         ▼
+    Telegram
+    (scan summary +
+     grab notifications)
+                           │
+                           ▼
+         Single-page app — static/js/
+    ┌────────┬────────┬────────┬─────────┬─────────┬────────┬────────┐
+    │ app.js │scan.js │ api.js │render.js│config.js│filters │modal.js│
+    │routing │polling │ fetch  │tabs /   │config   │search/ │detail  │
+    │state   │progress│toast   │cards /  │form /   │filter/ │modal / │
+    │nav     │badges  │utils   │charts   │cache    │sort    │trailer │
+    └────────┴────────┴────────┴─────────┴─────────┴────────┴────────┘
 ```
 
 ---

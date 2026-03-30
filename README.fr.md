@@ -297,6 +297,68 @@ http://IP_DU_NAS:8787
 
 ---
 
+## Architecture
+
+```
+Serveur Plex                       Serveur Jellyfin
+     │                                    │
+     │ API XML (~2s/1000 films)           │ API REST HTTP (paginée)
+     ▼                                    ▼
+ plex_xml.py                      jellyfin_api.py
+  (IDs TMDB, réalisateurs,        (IDs TMDB, réalisateurs,
+   acteurs, doublons)              acteurs, top 5/film)
+          \                              /
+           └──────── scan_movies() ─────┘
+                           │
+                           ▼
+            Moteur de scan 8 étapes — scanner.py (thread en arrière-plan)
+                           │
+     ┌─────────────────────┼──────────────────────┐
+     ▼                     ▼                       ▼
+  Sagas               Réalisateurs            Acteurs
+ (collections TMDB)   (person_credits)        (vote_count ≥ 500)
+     │                     │                       │
+     └─────────── Client API TMDB — tmdb.py ───────┘
+                  (thread-safe, cache disque,
+                   clé normalisée, flush/50 appels)
+                           │
+     ┌─────────────────────┼──────────────────────┐
+     ▼                     ▼                       ▼
+  Classiques           Suggestions             Scores
+ (Top Rated TMDB)    (recommandations        (sagas / réalisateurs /
+                      scorées par nombre      classiques / global)
+                      de correspondances)
+                           │
+                           ▼
+                     results.json ◄──── overrides.json
+                     (volume /data)     (wishlist, ignores,
+                           │            letterboxd_urls,
+                           ▼            rec_fetched_ids)
+                   FastAPI — web.py
+                   (42 endpoints API)
+         ┌─────────────────┼──────────────────┐
+         ▼                 ▼                  ▼
+    Radarr / 4K      Overseerr /         Letterboxd
+    (ajout, statut,  Jellyseerr          (RSS → TMDB,
+     grab poller)    (requête)           fusion multi-URL,
+         │                               FlareSolverr)
+         ▼
+    Telegram
+    (résumé scan +
+     notifications grab)
+                           │
+                           ▼
+         Application monopage — static/js/
+    ┌────────┬────────┬────────┬─────────┬─────────┬────────┬────────┐
+    │ app.js │scan.js │ api.js │render.js│config.js│filters │modal.js│
+    │routing │polling │ fetch  │onglets/ │config   │recherch│modal   │
+    │état    │progres │toast   │cartes / │form /   │filtre/ │détail /│
+    │nav     │badges  │utils   │graphes  │cache    │tri     │bande-a │
+    └────────┴────────┴────────┴─────────┴─────────┴────────┴────────┘
+```
+
+---
+
 ## Licence
 
 MIT
