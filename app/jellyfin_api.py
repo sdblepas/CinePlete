@@ -131,8 +131,8 @@ def scan_movies(lib_cfg=None):
 
             if tmdb_id in media_ids:
                 if tmdb_id not in tmdb_id_dupes:
-                    tmdb_id_dupes[tmdb_id] = [media_ids[tmdb_id]]
-                tmdb_id_dupes[tmdb_id].append(title)
+                    tmdb_id_dupes[tmdb_id] = [{"title": media_ids[tmdb_id], "edition": ""}]
+                tmdb_id_dupes[tmdb_id].append({"title": title, "edition": ""})
             else:
                 media_ids[tmdb_id] = title
 
