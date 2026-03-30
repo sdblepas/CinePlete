@@ -35,6 +35,70 @@ Cineplete prend en charge deux serveurs multimédia, sélectionnables depuis l'o
 - **Plex** — utilise l'API XML native (~2s pour 1000 films)
 - **Jellyfin** — utilise l'API HTTP Jellyfin, avec bouton **Test de connexion** intégré
 
+---
+
+### Support multi-bibliothèques
+
+**Nouveau en v3.0 :** Scannez plusieurs bibliothèques simultanément — combinez Plex et Jellyfin, ou connectez plusieurs serveurs.
+
+**Fonctionnalités clés :**
+- **Scan concurrent** — toutes les bibliothèques actives scannées en parallèle avec ThreadPoolExecutor
+- **Résultats fusionnés** — les doublons détectés automatiquement entre bibliothèques (même ID TMDB)
+- **Activation par bibliothèque** — activez/désactivez individuellement depuis l'onglet Config
+- **Tableau de bord unifié** — tous les graphiques et onglets affichent les données fusionnées
+- **Optimisation progressive** — les bibliothèques inchangées ignorent la ré-analyse (2-3 minutes → 2 secondes)
+
+**Cas d'usage :**
+- Scanner à la fois Plex (serveur principal) + Jellyfin (serveur 4K)
+- Plusieurs serveurs Plex (ex. local + distant)
+- Bibliothèques séparées (Films + Animés + Films étrangers)
+- Mélanger types de serveurs dans un seul déploiement
+
+**Configuration :**
+
+Les bibliothèques sont gérées depuis **Config → Bibliothèques**. Chaque bibliothèque possède :
+- **Type** — `plex` ou `jellyfin`
+- **Activée** — bascule on/off sans supprimer les identifiants
+- **Label** — nom convivial (affiché dans la progression du scan)
+- **Paramètres de connexion** — URL, token/clé API, nom de bibliothèque
+
+**Exemple config.yml :**
+
+```yaml
+LIBRARIES:
+  - id: "plex-main"
+    type: "plex"
+    enabled: true
+    label: "Plex Principal"
+    url: "http://192.168.1.10:32400"
+    token: "xxxxxxxxxxxx"
+    library_name: "Films"
+    page_size: 500
+    short_movie_limit: 60
+
+  - id: "jellyfin-4k"
+    type: "jellyfin"
+    enabled: true
+    label: "Jellyfin 4K"
+    url: "http://192.168.1.20:8096"
+    api_key: "xxxxxxxxxxxx"
+    library_name: "Films 4K"
+    page_size: 500
+    short_movie_limit: 60
+```
+
+**Migration automatique depuis v2.x :**
+
+L'ancienne configuration (paramètre unique `MEDIA_SERVER`) migre automatiquement vers le nouveau format `LIBRARIES` au premier démarrage. Aucune action manuelle requise — votre configuration existante continue de fonctionner.
+
+**Performance :**
+
+Avec 2 bibliothèques (1000 films chacune) :
+- Séquentiel : 4 secondes (Plex) + 6 secondes (Jellyfin) = 10 secondes
+- **Concurrent : ~6 secondes** (scan parallèle)
+
+---
+
 ### Scanner Plex ultra rapide
 
 Utilise l'API XML native de Plex.
@@ -244,26 +308,49 @@ Fichier : `config/config.yml` — éditable depuis l'onglet **Config** de l'inte
 
 | Clé | Description |
 |-----|-------------|
-| `MEDIA_SERVER` | `plex` ou `jellyfin` (défaut : `plex`) |
 | `TMDB_API_KEY` | Clé API TMDB classique (v3) — **pas** le Read Access Token |
 
 > ⚠️ Utiliser la **clé API** disponible sous TMDB → Paramètres → API → **Clé API** (chaîne alphanumérique courte). Ne **pas** utiliser le Read Access Token (longue chaîne JWT commençant par `eyJ`).
 
-**Paramètres Plex :**
+**Bibliothèques (v3.0+) :**
 
-| Clé | Description |
-|-----|-------------|
-| `PLEX_URL` | URL du serveur Plex |
-| `PLEX_TOKEN` | Token d'authentification Plex |
-| `LIBRARY_NAME` | Nom de la bibliothèque films dans Plex |
+Les bibliothèques sont configurées depuis **Config → Bibliothèques** dans l'interface. Chaque entrée inclut :
 
-**Paramètres Jellyfin :**
+| Clé | Requis | Description |
+|-----|--------|-------------|
+| `id` | Oui | Identifiant unique (ex. `plex-0`, `jellyfin-4k`) |
+| `type` | Oui | `plex` ou `jellyfin` |
+| `enabled` | Oui | `true` pour scanner, `false` pour ignorer |
+| `label` | Non | Nom convivial affiché dans la progression du scan |
+| `url` | Oui | URL du serveur (ex. `http://192.168.1.10:32400`) |
+| `token` | Plex uniquement | Token d'authentification Plex |
+| `api_key` | Jellyfin uniquement | Clé API Jellyfin |
+| `library_name` | Oui | Nom de la bibliothèque films |
+| `page_size` | Non | Taille de page API (défaut : 500) |
+| `short_movie_limit` | Non | Ignorer les films < N minutes (défaut : 60) |
 
-| Clé | Description |
-|-----|-------------|
-| `JELLYFIN_URL` | URL du serveur Jellyfin (ex. `http://192.168.1.10:8096`) |
-| `JELLYFIN_API_KEY` | Clé API depuis Jellyfin → Tableau de bord → Clés API |
-| `JELLYFIN_LIBRARY_NAME` | Nom de la bibliothèque films dans Jellyfin (défaut : `Movies`) |
+**Exemple de configuration multi-bibliothèques :**
+
+```yaml
+LIBRARIES:
+  - id: "plex-main"
+    type: "plex"
+    enabled: true
+    label: "Plex Principal"
+    url: "http://192.168.1.10:32400"
+    token: "xxxxxxxxxxxx"
+    library_name: "Films"
+
+  - id: "jellyfin-4k"
+    type: "jellyfin"
+    enabled: false
+    label: "Jellyfin 4K"
+    url: "http://192.168.1.20:8096"
+    api_key: "xxxxxxxxxxxx"
+    library_name: "Films 4K"
+```
+
+> **Configuration héritée (v2.x) :** Les anciens paramètres plats `PLEX_URL`, `PLEX_TOKEN`, `JELLYFIN_URL` fonctionnent toujours et migrent automatiquement vers le format `LIBRARIES` au premier chargement.
 
 **Paramètres avancés :**
 
