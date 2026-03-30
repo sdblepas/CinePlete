@@ -238,9 +238,10 @@ function movieCard(m, extraTag = ""){
     ? `<button class="btn-sm btn-radarr" onclick="addToRadarr(${m.tmdb},'${(m.title||'').replace(/'/g,"\\'")}',this)">+ Radarr</button>`
     : ""
 
+  const _mData = escHtml(JSON.stringify({tmdb:m.tmdb,title:m.title,year:m.year,poster:m.poster,rating:m.rating}))
   const wBtn = m.wishlist
-    ? `<button class="btn-sm btn-wishlisted" onclick="removeWishlist(${m.tmdb},this)">★ Wishlisted</button>`
-    : `<button class="btn-sm btn-wishlist"   onclick="addWishlist(${m.tmdb},this)">☆ Wishlist</button>`
+    ? `<button class="btn-sm btn-wishlisted" data-movie="${_mData}" onclick="removeWishlist(${m.tmdb},this)">★ Wishlisted</button>`
+    : `<button class="btn-sm btn-wishlist"   data-movie="${_mData}" onclick="addWishlist(${m.tmdb},this)">☆ Wishlist</button>`
 
   const rating = parseFloat(m.rating||0).toFixed(1)
   const pop    = Math.round(m.popularity||0)
@@ -1009,9 +1010,10 @@ function lbPosterCard(m) {
                    box-shadow:0 1px 4px rgba(0,0,0,.4)">×${score}</div>`
     : ""
 
+  const _lbData = escHtml(JSON.stringify({tmdb:m.tmdb,title:m.title,year:m.year,poster:m.poster,rating:m.rating}))
   const wBtn = m.wishlist
-    ? `<button class="btn-sm btn-wishlisted" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
-    : `<button class="btn-sm btn-wishlist"   onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆ Wishlist</button>`
+    ? `<button class="btn-sm btn-wishlisted" data-movie="${_lbData}" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
+    : `<button class="btn-sm btn-wishlist"   data-movie="${_lbData}" onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆ Wishlist</button>`
 
   const radarrBtn = CONFIG?.RADARR?.RADARR_ENABLED
     ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`
