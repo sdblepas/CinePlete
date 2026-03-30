@@ -6,7 +6,7 @@ from app.logger import get_logger
 
 log = get_logger(__name__)
 
-CONFIG_DIR = "/config"
+CONFIG_DIR = os.getenv("CONFIG_DIR", "/config")
 CONFIG_FILE = f"{CONFIG_DIR}/config.yml"
 
 
