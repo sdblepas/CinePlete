@@ -20,8 +20,10 @@ test.describe('Settings page', () => {
     await expect(field).toHaveAttribute('type', 'password')
   })
 
-  test('media server selector is present', async ({ page }) => {
-    await expect(page.locator('#cfg_media_server')).toBeVisible()
+  test('Libraries section is present with Add Plex and Add Jellyfin buttons', async ({ page }) => {
+    await expect(page.locator('#libraries-section')).toBeVisible()
+    await expect(page.locator('button', { hasText: '+ Add Plex' })).toBeVisible()
+    await expect(page.locator('button', { hasText: '+ Add Jellyfin' })).toBeVisible()
   })
 
   test('Save Configuration button is present and enabled', async ({ page }) => {
@@ -30,16 +32,16 @@ test.describe('Settings page', () => {
     await expect(saveBtn).toBeEnabled()
   })
 
-  test('Plex URL field is visible when Plex is selected', async ({ page }) => {
-    const selector = page.locator('#cfg_media_server')
-    await selector.selectOption('plex')
-    await expect(page.locator('#cfg_plex_url')).toBeVisible()
+  test('Add Plex entry renders URL and library name fields', async ({ page }) => {
+    await page.locator('button', { hasText: '+ Add Plex' }).click()
+    await expect(page.locator('[id^="lib_"][id$="_url"]').first()).toBeVisible()
+    await expect(page.locator('[id^="lib_"][id$="_library"]').first()).toBeVisible()
   })
 
-  test('Jellyfin URL field is visible when Jellyfin is selected', async ({ page }) => {
-    const selector = page.locator('#cfg_media_server')
-    await selector.selectOption('jellyfin')
-    await expect(page.locator('#cfg_jf_url')).toBeVisible()
+  test('Add Jellyfin entry renders URL and library name fields', async ({ page }) => {
+    await page.locator('button', { hasText: '+ Add Jellyfin' }).click()
+    await expect(page.locator('[id^="lib_"][id$="_url"]').first()).toBeVisible()
+    await expect(page.locator('[id^="lib_"][id$="_library"]').first()).toBeVisible()
   })
 
   test('config roundtrip: save then reload preserves values', async ({ page, request }) => {
