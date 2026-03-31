@@ -174,6 +174,9 @@ function _libEntryHtml(lib, idx) {
         style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;
                color:var(--text);font-family:'DM Mono',monospace;font-size:.78rem;
                padding:.4rem .65rem;box-sizing:border-box"/>
+      <div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">
+        Exact name of the library in ${isPlex?"Plex":"Jellyfin"} (e.g. "Movies"). Case-sensitive.
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:.5rem;margin-top:.25rem">
       <button class="btn-sm" style="font-size:.72rem;padding:5px 14px"

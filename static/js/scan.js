@@ -8,9 +8,12 @@ async function loadConfig(){
   CONFIG = await api("/api/config")
 }
 
+let SETUP_ISSUES = []
+
 async function loadStatus(){
   const s = await api("/api/config/status")
-  CONFIGURED = !!s.configured
+  CONFIGURED   = !!s.configured
+  SETUP_ISSUES = s.issues || []
 }
 
 async function loadResults(){
@@ -43,7 +46,13 @@ function updateBadges(){
 }
 
 async function rescan(){
-  if (!CONFIGURED){ toast("Complete setup first.", "error"); return }
+  if (!CONFIGURED){
+    const msg = SETUP_ISSUES.length
+      ? "Setup incomplete: " + SETUP_ISSUES[0]
+      : "Complete setup first."
+    toast(msg, "error")
+    return
+  }
   const res = await api("/api/scan","POST")
   if (!res.ok){ toast(res.error || "Could not start scan","error"); return }
   startPolling()
