@@ -306,3 +306,30 @@ jobs:
             sdblepas/cineplete:${{ needs.version.outputs.version }}
           cache-from: type=gha
           cache-to:   type=gha,mode=max
+
+  # ─────────────────────────────────────────────
+  # 5. INSTALL SCRIPT SMOKE TEST (non-blocking)
+  # ─────────────────────────────────────────────
+  install-smoke:
+    name: Install Script Smoke Test
+    needs: version
+    if: needs.version.outputs.is_main == 'true' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run install script (no systemd)
+        env:
+          SKIP_SYSTEMD: "1"
+        run: sudo -E bash install/install.sh
+
+      - name: Start app manually
+        run: |
+          sudo -u cineplete /opt/cineplete/.venv/bin/uvicorn app.web:app \
+            --host 0.0.0.0 --port 7474 &
+          sleep 5
+
+      - name: Smoke test — check /api/version responds
+        run: curl -sf http://localhost:7474/api/version | grep -q version

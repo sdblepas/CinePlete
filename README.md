@@ -493,7 +493,63 @@ LIBRARIES:
 
 ## Installation
 
-### Docker Compose (recommended)
+### Option 1 — Generic LXC / VM / Bare Metal (Debian · Ubuntu · Raspberry Pi)
+
+One-liner — run as root inside your container or VM:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | bash
+```
+
+What it does: installs Python 3.11+, creates a dedicated `cineplete` user, downloads the latest release, sets up a Python virtualenv, and registers a systemd service that starts automatically on boot.
+
+**Re-running the same command acts as an update.**
+
+Post-install management:
+```bash
+journalctl -u cineplete -f          # live logs
+systemctl restart cineplete          # restart
+systemctl status cineplete           # status
+```
+
+---
+
+### Option 2 — Proxmox LXC (one command on the Proxmox host)
+
+Run this **on your Proxmox host** as root — it creates a fresh unprivileged Debian 12 LXC and installs CinePlete inside it automatically:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/proxmox-lxc.sh)"
+```
+
+**With custom options:**
+```bash
+CT_ID=200 CT_IP=192.168.1.50/24 CT_GW=192.168.1.1 CT_RAM=1024 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/proxmox-lxc.sh)"
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CT_ID` | next available | LXC container ID |
+| `CT_IP` | `dhcp` | Static IP in CIDR notation (e.g. `192.168.1.50/24`) |
+| `CT_GW` | _(none)_ | Gateway for static IP |
+| `CT_CORES` | `2` | CPU cores |
+| `CT_RAM` | `512` | RAM in MB |
+| `CT_DISK` | `4` | Disk in GB |
+| `CT_BRIDGE` | `vmbr0` | Network bridge |
+| `PORT` | `7474` | App listen port |
+
+Post-install management from the Proxmox host:
+```bash
+pct exec <CT_ID> -- journalctl -u cineplete -f     # live logs
+pct exec <CT_ID> -- bash                            # open shell
+# Update:
+pct exec <CT_ID> -- bash -c "curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | bash"
+```
+
+---
+
+### Option 3 — Docker Compose (recommended)
 
 ```yaml
 version: "3.9"

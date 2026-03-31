@@ -372,6 +372,64 @@ LIBRARIES:
 
 ## Installation
 
+### Option 1 — LXC / VM / Bare Metal générique (Debian · Ubuntu · Raspberry Pi)
+
+En une commande — à exécuter en root dans votre conteneur ou VM :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | bash
+```
+
+Ce script : installe Python 3.11+, crée un utilisateur dédié `cineplete`, télécharge la dernière version, configure un virtualenv Python et enregistre un service systemd qui démarre automatiquement au boot.
+
+**Relancer la même commande suffit pour mettre à jour.**
+
+Gestion après installation :
+```bash
+journalctl -u cineplete -f          # logs en direct
+systemctl restart cineplete          # redémarrer
+systemctl status cineplete           # statut
+```
+
+---
+
+### Option 2 — LXC Proxmox (une commande sur l'hôte Proxmox)
+
+À exécuter **sur votre hôte Proxmox** en root — crée un LXC Debian 12 non privilégié et installe CinePlete à l'intérieur automatiquement :
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/proxmox-lxc.sh)"
+```
+
+**Avec options personnalisées :**
+```bash
+CT_ID=200 CT_IP=192.168.1.50/24 CT_GW=192.168.1.1 CT_RAM=1024 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/proxmox-lxc.sh)"
+```
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `CT_ID` | prochain disponible | ID du conteneur LXC |
+| `CT_IP` | `dhcp` | IP statique en notation CIDR (ex. `192.168.1.50/24`) |
+| `CT_GW` | _(aucune)_ | Passerelle pour l'IP statique |
+| `CT_CORES` | `2` | Nombre de cœurs CPU |
+| `CT_RAM` | `512` | RAM en Mo |
+| `CT_DISK` | `4` | Disque en Go |
+| `CT_BRIDGE` | `vmbr0` | Bridge réseau |
+| `PORT` | `7474` | Port d'écoute de l'application |
+
+Gestion après installation depuis l'hôte Proxmox :
+```bash
+pct exec <CT_ID> -- journalctl -u cineplete -f     # logs en direct
+pct exec <CT_ID> -- bash                            # ouvrir un shell
+# Mise à jour :
+pct exec <CT_ID> -- bash -c "curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | bash"
+```
+
+---
+
+### Option 3 — Docker Compose (recommandé)
+
 ```bash
 docker compose up -d
 ```
