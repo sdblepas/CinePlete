@@ -374,10 +374,10 @@ LIBRARIES:
 
 ### Option 1 — LXC / VM / Bare Metal générique (Debian · Ubuntu · Raspberry Pi)
 
-En une commande — à exécuter en root dans votre conteneur ou VM :
+En une commande — à exécuter dans votre conteneur ou VM :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | sudo bash
 ```
 
 Ce script : installe Python 3.11+, crée un utilisateur dédié `cineplete`, télécharge la dernière version, configure un virtualenv Python et enregistre un service systemd qui démarre automatiquement au boot.

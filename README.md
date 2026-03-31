@@ -495,10 +495,10 @@ LIBRARIES:
 
 ### Option 1 — Generic LXC / VM / Bare Metal (Debian · Ubuntu · Raspberry Pi)
 
-One-liner — run as root inside your container or VM:
+One-liner — run inside your container or VM:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sdblepas/CinePlete/main/install/install.sh | sudo bash
 ```
 
 What it does: installs Python 3.11+, creates a dedicated `cineplete` user, downloads the latest release, sets up a Python virtualenv, and registers a systemd service that starts automatically on boot.
