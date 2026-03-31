@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>CinePlete</Name>
+  <Repository>sdblepas/cineplete:latest</Repository>
+  <Registry>https://hub.docker.com/r/sdblepas/cineplete</Registry>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/sdblepas/CinePlete/issues</Support>
+  <Project>https://github.com/sdblepas/CinePlete</Project>
+  <Overview>
+    CinePlete scans your Plex or Jellyfin movie library and shows exactly what you are missing — from franchises, directors, actors, and classics. Includes a dashboard with charts, Radarr/Overseerr/Jellyseerr integration, Letterboxd import, wishlist, ignore system, and smart authentication.
+  </Overview>
+  <Category>MediaApp:Video Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8787]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/sdblepas/CinePlete/main/unraid/CinePlete.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/sdblepas/CinePlete/main/assets/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+
+  <Config Name="WebUI Port" Target="8787" Default="8787" Mode="tcp"
+          Description="Port to access the CinePlete web interface."
+          Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/cineplete/config"
+          Description="Stores config.yml — persists your settings across updates."
+          Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/cineplete/config</Config>
+
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/cineplete/data"
+          Description="Stores scan results, TMDB cache, wishlist, and logs."
+          Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/cineplete/data</Config>
+</Container>
