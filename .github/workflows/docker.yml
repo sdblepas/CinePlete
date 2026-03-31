@@ -327,11 +327,21 @@ jobs:
 
       - name: Start app manually
         run: |
-          sudo -u cineplete bash -c "
+          sudo -u cineplete bash -c '
             cd /opt/cineplete
-            /opt/cineplete/.venv/bin/uvicorn app.web:app --host 0.0.0.0 --port 7474
-          " &
-          sleep 5
+            nohup /opt/cineplete/.venv/bin/uvicorn app.web:app \
+              --host 127.0.0.1 \
+              --port 7474 \
+              >/tmp/cineplete.log 2>&1 &
+          '
 
-      - name: Smoke test — check /api/version responds
-        run: curl -sf http://localhost:7474/api/version | grep -q version
+      - name: Wait for app
+        run: |
+          for i in {1..30}; do
+            if curl -fs http://127.0.0.1:7474/api/version >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/cineplete.log || true
+          exit 1
