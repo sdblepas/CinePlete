@@ -20,7 +20,6 @@
 ![TMDB](https://img.shields.io/badge/TMDB-API-blue)
 ![Homelab](https://img.shields.io/badge/homelab-friendly-blue)
 ![Proxmox](https://img.shields.io/badge/Proxmox-LXC--ready-E57000?logo=proxmox&logoColor=white)
-![LXC](https://img.shields.io/badge/LXC-supported-333333)
 ![GitHub Stars](https://img.shields.io/github/stars/sdblepas/CinePlete?style=social)
 
 > 🇫🇷 [Version française](README.fr.md)

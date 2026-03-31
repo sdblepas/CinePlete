@@ -6,7 +6,6 @@
 ![License](https://img.shields.io/github/license/sdblepas/CinePlete)
 
 ![Proxmox](https://img.shields.io/badge/Proxmox-LXC--ready-E57000?logo=proxmox&logoColor=white)
-![LXC](https://img.shields.io/badge/LXC-supported-333333)
 
 > 🇬🇧 [English version](README.md)
 
