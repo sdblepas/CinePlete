@@ -105,18 +105,27 @@ def library_test(payload: dict = Body(...)):
                 return {"ok": False, "error": "URL and token are required"}
             if urlparse(url).scheme not in ("http", "https"):
                 return {"ok": False, "error": "URL must start with http:// or https://"}
+            import requests as _req
             lib_cfg = {"url": url, "token": token, "library_name": lib,
                        "page_size": 500, "short_movie_limit": 60}
-            xml  = plex_get("/library/sections", lib_cfg)
+            try:
+                xml  = plex_get("/library/sections", lib_cfg)
+            except _req.exceptions.ConnectionError as ce:
+                return {"ok": False, "error": f"Cannot reach Plex at {url} — {ce}"}
+            except _req.exceptions.HTTPError as he:
+                code = he.response.status_code if he.response is not None else "?"
+                if code == 401:
+                    return {"ok": False, "error": "Invalid Plex token (401 Unauthorized)"}
+                return {"ok": False, "error": f"Plex returned HTTP {code}"}
             root = _ET.fromstring(xml)
             libs = [d.attrib.get("title","") for d in root.findall("Directory")
                     if d.attrib.get("type") == "movie"]
             if lib and lib not in libs:
-                return {"ok": False, "error": f"Library '{lib}' not found. Available: {', '.join(libs)}"}
+                return {"ok": False, "error": f"Library '{lib}' not found. Available: {', '.join(libs) or 'none'}"}
             return {"ok": True, "libraries": libs}
     except Exception as e:
-        log.debug(f"Library test failed: {e}")
-        return {"ok": False, "error": "Could not connect — check URL and credentials"}
+        log.warning(f"Library test failed: {e}")
+        return {"ok": False, "error": str(e) or "Could not connect — check URL and credentials"}
 
 
 # --------------------------------------------------
