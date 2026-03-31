@@ -201,32 +201,67 @@ def save_config(data: dict) -> dict:
     return merged
 
 
-def is_configured(cfg: dict | None = None) -> bool:
+def config_issues(cfg: dict | None = None) -> list[str]:
+    """Return a list of human-readable setup problems (empty = fully configured)."""
     cfg  = cfg or load_config()
+    issues: list[str] = []
+
     tmdb = cfg.get("TMDB", {})
     if not str(tmdb.get("TMDB_API_KEY", "")).strip():
-        return False
+        issues.append("TMDB API key is missing.")
 
     libraries = cfg.get("LIBRARIES", [])
     enabled   = [l for l in libraries if l.get("enabled")]
+
+    if not enabled:
+        # Check legacy flat config before reporting no library
+        media_server = cfg.get("SERVER", {}).get("MEDIA_SERVER", "plex").lower()
+        if media_server == "jellyfin":
+            jf = cfg.get("JELLYFIN", {})
+            if not str(jf.get("JELLYFIN_URL", "")).strip():
+                issues.append("Jellyfin URL is missing.")
+            if not str(jf.get("JELLYFIN_API_KEY", "")).strip():
+                issues.append("Jellyfin API key is missing.")
+            if not str(jf.get("JELLYFIN_LIBRARY_NAME", "")).strip():
+                issues.append("Jellyfin library name is missing.")
+        else:
+            plex = cfg.get("PLEX", {})
+            if not str(plex.get("PLEX_URL", "")).strip():
+                issues.append("Plex URL is missing.")
+            if not str(plex.get("PLEX_TOKEN", "")).strip():
+                issues.append("Plex token is missing.")
+            if not str(plex.get("LIBRARY_NAME", "")).strip():
+                issues.append("Plex library name is missing.")
+        return issues
+
+    # At least one enabled library must be fully filled in
+    lib_issues: list[str] = []
+    any_complete = False
     for lib in enabled:
+        label    = lib.get("label") or lib.get("type", "Library").capitalize()
         lib_type = lib.get("type", "plex").lower()
         if lib_type == "jellyfin":
-            if lib.get("url") and lib.get("api_key") and lib.get("library_name"):
-                return True
+            missing = []
+            if not lib.get("url"):          missing.append("URL")
+            if not lib.get("api_key"):      missing.append("API key")
+            if not lib.get("library_name"): missing.append("library name")
         else:
-            if lib.get("url") and lib.get("token") and lib.get("library_name"):
-                return True
+            missing = []
+            if not lib.get("url"):          missing.append("URL")
+            if not lib.get("token"):        missing.append("token")
+            if not lib.get("library_name"): missing.append("library name")
 
-    # Fall back to legacy flat config check for users mid-migration
-    media_server = cfg.get("SERVER", {}).get("MEDIA_SERVER", "plex").lower()
-    if media_server == "jellyfin":
-        jf = cfg.get("JELLYFIN", {})
-        return all([str(jf.get("JELLYFIN_URL","")).strip(),
-                    str(jf.get("JELLYFIN_API_KEY","")).strip(),
-                    str(jf.get("JELLYFIN_LIBRARY_NAME","")).strip()])
-    else:
-        plex = cfg.get("PLEX", {})
-        return all([str(plex.get("PLEX_URL","")).strip(),
-                    str(plex.get("PLEX_TOKEN","")).strip(),
-                    str(plex.get("LIBRARY_NAME","")).strip()])
+        if missing:
+            lib_issues.append(f"{label}: {', '.join(missing)} missing.")
+        else:
+            any_complete = True
+
+    # Only surface library issues when NO library is fully configured
+    if not any_complete:
+        issues.extend(lib_issues)
+
+    return issues
+
+
+def is_configured(cfg: dict | None = None) -> bool:
+    return len(config_issues(cfg)) == 0

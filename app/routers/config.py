@@ -10,7 +10,7 @@ import requests
 from fastapi import APIRouter, Body
 from urllib.parse import urlparse
 
-from app.config import load_config, save_config, is_configured
+from app.config import load_config, save_config, is_configured, config_issues
 from app.auth import hash_password, generate_secret_key
 from app import scheduler
 from app.routers._shared import log
@@ -37,8 +37,9 @@ def api_get_config():
 
 @router.get("/api/config/status")
 def api_config_status():
-    cfg = load_config()
-    return {"configured": is_configured(cfg)}
+    cfg    = load_config()
+    issues = config_issues(cfg)
+    return {"configured": len(issues) == 0, "issues": issues}
 
 
 @router.post("/api/config")
