@@ -327,9 +327,10 @@ jobs:
 
       - name: Start app manually
         run: |
-          sudo -u cineplete /opt/cineplete/.venv/bin/uvicorn app.web:app \
-            --app-dir /opt/cineplete \
-            --host 0.0.0.0 --port 7474 &
+          sudo -u cineplete bash -c "
+            cd /opt/cineplete
+            /opt/cineplete/.venv/bin/uvicorn app.web:app --host 0.0.0.0 --port 7474
+          " &
           sleep 5
 
       - name: Smoke test — check /api/version responds
