@@ -49,11 +49,39 @@ def is_local_address(ip_str: str) -> bool:
 
 
 def get_client_ip(request) -> str:
-    """Extract real client IP, respecting X-Forwarded-For for reverse proxies."""
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else "127.0.0.1"
+    """
+    Extract the real client IP.
+
+    X-Forwarded-For is only trusted when the direct connection comes from an
+    IP listed in AUTH.TRUSTED_PROXIES (comma-separated IPs/CIDRs). Trusting
+    XFF blindly allows spoofing by setting the header to 127.0.0.1, which
+    would bypass DisabledForLocalAddresses auth.
+    """
+    from app.config import load_config
+    client_host = request.client.host if request.client else "127.0.0.1"
+
+    trusted_raw = load_config().get("AUTH", {}).get("TRUSTED_PROXIES", "").strip()
+    if trusted_raw:
+        trusted_nets = []
+        for entry in trusted_raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                trusted_nets.append(ipaddress.ip_network(entry, strict=False))
+            except ValueError:
+                pass
+
+        try:
+            client_ip = ipaddress.ip_address(client_host)
+            if any(client_ip in net for net in trusted_nets):
+                xff = request.headers.get("X-Forwarded-For", "")
+                if xff:
+                    return xff.split(",")[0].strip()
+        except ValueError:
+            pass
+
+    return client_host
 
 
 # ---------------------------------------------------------------------------

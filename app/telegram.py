@@ -129,7 +129,7 @@ def send_scan_summary(results: dict, duration_s: int | None = None):
 
 def send_radarr_grab(title: str, year: str | None = None) -> None:
     """
-    Send a Telegram notification when Radarr grabs a wishlist movie.
+    Send a Telegram notification when Radarr grabs a single wishlist movie.
     Does NOT enforce TELEGRAM_MIN_INTERVAL — each grab is a discrete event.
     """
     cfg     = load_config()
@@ -145,3 +145,26 @@ def send_radarr_grab(title: str, year: str | None = None) -> None:
     if _send(token, chat_id, text):
         log.info(f"Telegram grab notification sent: {title}")
         time.sleep(1.1)   # respect Telegram rate limit (1 msg/sec for private chats)
+
+
+def send_radarr_grab_batch(movies: list[tuple[str, str | None]]) -> None:
+    """
+    Send a single batched Telegram notification for multiple Radarr grabs.
+    Used when more than one wishlist movie is grabbed at once to avoid
+    hitting Telegram's rate limit with individual messages.
+    """
+    cfg     = load_config()
+    tg      = cfg.get("TELEGRAM", {})
+    if not tg.get("TELEGRAM_ENABLED"):
+        return
+    token   = tg.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = tg.get("TELEGRAM_CHAT_ID",   "").strip()
+    if not token or not chat_id:
+        return
+    lines = []
+    for title, year in movies:
+        year_str = f" ({year})" if year else ""
+        lines.append(f"• {title}{year_str}")
+    text = f"⬇️ *Radarr grabbed {len(movies)} wishlist movies:*\n" + "\n".join(lines)
+    if _send(token, chat_id, text):
+        log.info(f"Telegram batch grab notification sent: {len(movies)} movies")

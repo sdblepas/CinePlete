@@ -71,11 +71,13 @@ def save_snapshot(plex_ids: dict):
     """Persist current library TMDB IDs for progressive scan comparison."""
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
-        with open(SNAPSHOT_FILE, "w", encoding="utf-8") as f:
+        tmp = SNAPSHOT_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump({
                 "plex_ids": list(plex_ids.keys()),
                 "saved_at": datetime.utcnow().isoformat() + "Z",
             }, f)
+        os.replace(tmp, SNAPSHOT_FILE)
     except OSError as e:
         log.warning(f"Could not save scan snapshot: {e}")
 

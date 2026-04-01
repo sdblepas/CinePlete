@@ -12,7 +12,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import PlainTextResponse
 
 from app.config import load_config, is_configured
-from app.scanner import build_async, scan_state
+from app.scanner import build_async, scan_state, _scan_lock
 from app.routers._shared import log, read_results, LOG_FILE
 
 router = APIRouter()
@@ -69,16 +69,17 @@ def api_scan_status():
     Returns current scan progress. Poll this while scan_state['running'] is True.
     When running is False and error is None, fetch /api/results for fresh data.
     """
-    return {
-        "running":        scan_state["running"],
-        "step":           scan_state["step"],
-        "step_index":     scan_state["step_index"],
-        "step_total":     scan_state["step_total"],
-        "detail":         scan_state["detail"],
-        "error":          scan_state["error"],
-        "last_completed": scan_state["last_completed"],
-        "last_duration":  scan_state["last_duration"],
-    }
+    with _scan_lock:
+        return {
+            "running":        scan_state["running"],
+            "step":           scan_state["step"],
+            "step_index":     scan_state["step_index"],
+            "step_total":     scan_state["step_total"],
+            "detail":         scan_state["detail"],
+            "error":          scan_state["error"],
+            "last_completed": scan_state["last_completed"],
+            "last_duration":  scan_state["last_duration"],
+        }
 
 
 # --------------------------------------------------

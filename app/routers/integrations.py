@@ -188,8 +188,10 @@ def overseerr_add(payload: dict = Body(...)):
     tmdb_id = _parse_tmdb_id(payload.get("tmdb"))
     if tmdb_id is None:
         return {"ok": False, "error": "Invalid TMDB ID"}
-    headers = {"X-Api-Key": cfg["OVERSEERR_API_KEY"],
-               "Content-Type": "application/json"}
+    api_key = cfg.get("OVERSEERR_API_KEY", "").strip()
+    if not api_key:
+        return {"ok": False, "error": "Overseerr API key not configured"}
+    headers = {"X-Api-Key": api_key, "Content-Type": "application/json"}
     try:
         r = requests.post(
             f"{cfg['OVERSEERR_URL'].rstrip('/')}/api/v1/request",
@@ -215,8 +217,10 @@ def jellyseerr_add(payload: dict = Body(...)):
     tmdb_id = _parse_tmdb_id(payload.get("tmdb"))
     if tmdb_id is None:
         return {"ok": False, "error": "Invalid TMDB ID"}
-    headers = {"X-Api-Key": cfg["JELLYSEERR_API_KEY"],
-               "Content-Type": "application/json"}
+    api_key = cfg.get("JELLYSEERR_API_KEY", "").strip()
+    if not api_key:
+        return {"ok": False, "error": "Jellyseerr API key not configured"}
+    headers = {"X-Api-Key": api_key, "Content-Type": "application/json"}
     try:
         r = requests.post(
             f"{cfg['JELLYSEERR_URL'].rstrip('/')}/api/v1/request",

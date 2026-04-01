@@ -194,11 +194,16 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> 
         elif item_link:
             list_links.append((item_link, item_desc))
 
+    _MAX_MOVIES_PER_FEED = 500   # cap to prevent thousands of TMDB calls per URL
+
     if not movies and list_links and _depth == 0:
         log.debug(
             f"Letterboxd: lists feed at {rss_url} — expanding {len(list_links)} lists"
         )
         for list_url, desc_html in list_links[:10]:
+            if len(movies) >= _MAX_MOVIES_PER_FEED:
+                log.debug(f"Letterboxd: reached {_MAX_MOVIES_PER_FEED}-movie cap, stopping expansion")
+                break
             child_movies = _fetch_letterboxd_rss(list_url, _depth=1, flaresolverr=flaresolverr)
             if child_movies:
                 movies.extend(child_movies)
@@ -210,7 +215,7 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> 
                 )
                 movies.extend(fallback)
 
-    return movies
+    return movies[:_MAX_MOVIES_PER_FEED]
 
 
 def _validate_letterboxd_url(url: str):
