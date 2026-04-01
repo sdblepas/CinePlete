@@ -19,9 +19,15 @@ async function api(path, method = "GET", body = null){
       }
     }
 
-    // Success - merge response data with metadata
+    // HTTP 200 - parse response and preserve backend's ok field if present
     const data = await r.json()
-    return { ...data, ok: true, status: r.status }
+    // If backend explicitly sets ok: false (business logic error), preserve it
+    // Otherwise assume success and set ok: true
+    return {
+      ...data,
+      status: r.status,
+      ok: data.ok !== undefined ? data.ok : true
+    }
   } catch (e) {
     // Network error or other fetch failure
     console.error("API request failed:", e)
