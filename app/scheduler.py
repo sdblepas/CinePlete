@@ -206,7 +206,7 @@ def _poll_radarr_grabs() -> None:
     flood of notifications for past grabs on first start).
     """
     import time
-    from app.telegram import send_radarr_grab
+    from app.telegram import send_radarr_grab, send_radarr_grab_batch
 
     cfg    = load_config()
     radarr = cfg.get("RADARR", {})
@@ -250,14 +250,22 @@ def _poll_radarr_grabs() -> None:
     first_run  = not os.path.exists(GRAB_SEEN_FILE)
 
     if first_run:
-        # Seed without notifying — avoids a blast on first start
+        # Seed only recent events (last 7 days) to avoid loading unbounded history
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
         for event in records:
-            seen_ids.add(event.get("id"))
+            grabbed_at = event.get("date", "")
+            try:
+                dt = datetime.fromisoformat(grabbed_at.replace("Z", "+00:00"))
+                if dt >= cutoff:
+                    seen_ids.add(event.get("id"))
+            except Exception:
+                seen_ids.add(event.get("id"))
         _save_seen_ids(seen_ids)
-        log.info(f"Radarr grab poller: first run, seeded {len(seen_ids)} event IDs")
+        log.info(f"Radarr grab poller: first run, seeded {len(seen_ids)} recent event IDs")
         return
 
-    notified = 0
+    grabbed_movies: list[tuple[str, str | None]] = []
     for event in records:
         event_id = event.get("id")
         if not event_id or event_id in seen_ids:
@@ -269,13 +277,16 @@ def _poll_radarr_grabs() -> None:
         if tmdb_id and tmdb_id in wishlist:
             title = event.get("movie", {}).get("title", "Unknown")
             year  = str(event.get("movie", {}).get("year", "")) or None
-            send_radarr_grab(title, year)
-            notified += 1
-            time.sleep(0.05)   # Telegram rate-limit safeguard
+            grabbed_movies.append((title, year))
 
     _save_seen_ids(seen_ids)
-    if notified:
-        log.info(f"Radarr grab poller: {notified} wishlist grab(s) notified")
+
+    if grabbed_movies:
+        if len(grabbed_movies) == 1:
+            send_radarr_grab(*grabbed_movies[0])
+        else:
+            send_radarr_grab_batch(grabbed_movies)
+        log.info(f"Radarr grab poller: {len(grabbed_movies)} wishlist grab(s) notified")
 
 
 def _scheduled_scan():
@@ -386,7 +397,9 @@ def stop():
     """Stop the scheduler cleanly."""
     global _scheduler
     if _scheduler and _scheduler.running:
-        _scheduler.shutdown(wait=False)
+        # wait=True lets any in-flight poll/trigger job finish before shutting down
+        # (jobs are short — they only launch threads, not block until scan completes)
+        _scheduler.shutdown(wait=True)
         log.info("Library polling stopped")
 
 

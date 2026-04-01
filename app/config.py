@@ -108,6 +108,9 @@ DEFAULT_CONFIG = {
         "AUTH_PASSWORD_HASH": "",
         "AUTH_PASSWORD_SALT": "",
         "AUTH_SECRET_KEY": "",   # auto-generated on first save
+        # Comma-separated IPs/CIDRs whose X-Forwarded-For header is trusted.
+        # Only set this if CinePlete sits behind a known reverse proxy.
+        "TRUSTED_PROXIES": "",
     },
 }
 

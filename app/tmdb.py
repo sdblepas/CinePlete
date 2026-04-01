@@ -16,6 +16,7 @@ CACHE_FILE = f"{DATA_DIR}/tmdb_cache.json"
 FLUSH_EVERY = 50
 
 _RETRY_DELAYS = (2, 4, 8)   # seconds between network-error retries
+MAX_CACHE_ENTRIES = 10_000  # LRU eviction threshold
 
 
 def ensure_data_dir():
@@ -110,7 +111,7 @@ class TMDB:
             if r.status_code >= 500:
                 self._error_count += 1
                 log.warning(f"TMDB server error {r.status_code} (attempt {attempt}) — {cache_key}")
-                if attempt > 1:
+                if attempt > len(_RETRY_DELAYS):
                     return {}
                 time.sleep(5)
                 continue
@@ -140,7 +141,8 @@ class TMDB:
         time.sleep(self.delay)
         data = self._request(url)
 
-        # Write back under lock
+        # Write back under lock — take a snapshot for flushing outside the lock
+        cache_snapshot = None
         with self._lock:
             # Double-check: another thread may have fetched same key while we waited
             if cache_key in self.cache:
@@ -150,9 +152,17 @@ class TMDB:
                 self.cache[cache_key] = data
                 self._calls_since_flush += 1
 
+                # Evict oldest entries (insertion-order LRU) if over limit
+                while len(self.cache) > MAX_CACHE_ENTRIES:
+                    self.cache.pop(next(iter(self.cache)))
+
                 if self._calls_since_flush >= FLUSH_EVERY:
-                    save_cache(self.cache)
-                    self._calls_since_flush = 0
+                    self._calls_since_flush = 0          # reset inside lock
+                    cache_snapshot = dict(self.cache)    # snapshot inside lock
+
+        # File I/O outside the lock so other threads aren't blocked
+        if cache_snapshot is not None:
+            save_cache(cache_snapshot)
 
         return data
 
