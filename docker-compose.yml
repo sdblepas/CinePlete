@@ -3,6 +3,9 @@ services:
   cineplete:
     image: sdblepas/cineplete:latest
     container_name: cineplete
+    environment:
+      - PUID=1000   # set to your host user ID (id -u)
+      - PGID=1000   # set to your host group ID (id -g)
     ports:
       - "8787:8787"
     volumes:

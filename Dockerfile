@@ -10,15 +10,19 @@ COPY app /app/app
 COPY static /app/static
 COPY config /app/config
 
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+COPY entrypoint.sh /entrypoint.sh
+
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends gosu && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 RUN useradd -m -u 1000 cineplete && \
     mkdir -p /data /config && \
-    chown -R cineplete:cineplete /app /data /config
-USER cineplete
+    chown -R cineplete:cineplete /app /data /config && \
+    chmod +x /entrypoint.sh
 
 EXPOSE 8787
 
-CMD ["uvicorn", "app.web:app", "--host", "0.0.0.0", "--port", "8787"]
+ENTRYPOINT ["/entrypoint.sh"]

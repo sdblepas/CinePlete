@@ -66,7 +66,11 @@ def api_save_config(payload: dict = Body(...)):
     )
 
     payload["AUTH"] = auth_payload
-    cfg = save_config(payload)
+    try:
+        cfg = save_config(payload)
+    except OSError as e:
+        log.error(f"Cannot write config file: {e}")
+        return {"ok": False, "error": f"Cannot write to /config — check folder permissions and PUID/PGID ({e})"}
     scheduler.restart()
     return {"ok": True, "configured": is_configured(cfg)}
 
