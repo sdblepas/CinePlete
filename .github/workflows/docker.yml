@@ -19,8 +19,6 @@ on:
   push:
     branches:
       - "**"
-    tags:
-      - "v*"
 
 permissions:
   contents: write
