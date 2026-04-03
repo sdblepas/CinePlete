@@ -683,6 +683,7 @@ def build():
         "_ignored_franchises": list(ignore_franchises),
         "_ignored_directors":  list(ignore_directors),
         "_ignored_actors":     list(ignore_actors),
+        "owned_tmdb_ids": sorted(plex_ids.keys()),
         "no_tmdb_guid":   no_tmdb_guid,
         "tmdb_not_found": tmdb_not_found,
         "duplicates":     duplicates,

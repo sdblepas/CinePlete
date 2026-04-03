@@ -9,6 +9,12 @@ const _charts = {}
 function destroyChart(id){ if(_charts[id]){_charts[id].destroy();delete _charts[id]} }
 function mkChart(id,cfg){ destroyChart(id); _charts[id]=new Chart(document.getElementById(id),cfg); return _charts[id] }
 
+let _dashRO = null   // ResizeObserver for dashboard charts
+
+function _teardownDashRO(){
+  if (_dashRO){ _dashRO.disconnect(); _dashRO = null }
+}
+
 /* ── Pagination state ────────────────────────────────────── */
 
 const PAGE_SIZE = 24
@@ -41,6 +47,7 @@ function _paginate(list, tab) {
 /* ── Dashboard ───────────────────────────────────────────── */
 
 function renderDashboard(){
+  _teardownDashRO()
   const c = document.getElementById("content")
   const s = DATA.scores||{}
   const p = DATA.media_server || DATA.plex || {}
@@ -338,6 +345,15 @@ function renderDashboard(){
         plugins:{legend:{display:false},tooltip:{callbacks:{title:ctx=>`Missing: ${ctx[0].label} films`}}}
       }
     })
+
+    // Resize all dashboard charts when the content area changes size
+    // (covers fullscreen toggle, sidebar collapse, window resize)
+    _teardownDashRO()
+    _dashRO = new ResizeObserver(() => {
+      Object.values(_charts).forEach(ch => { try { ch.resize() } catch(_){} })
+    })
+    const contentEl = document.getElementById("content")
+    if (contentEl) _dashRO.observe(contentEl)
   })
 }
 
@@ -349,9 +365,14 @@ function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg 
   const sort        = getSort()
   const genreFilter = getGenreFilter()
 
+  // When sort=title, sort the group headers themselves A-Z
+  const orderedGroups = sort === "title"
+    ? [...groups].sort((a, b) => (a[nameKey]||"").localeCompare(b[nameKey]||""))
+    : groups
+
   let html = ""
 
-  groups.forEach(g => {
+  orderedGroups.forEach(g => {
     const name = g[nameKey]||""
     if (groupFilter && name !== groupFilter) return
 
@@ -435,7 +456,9 @@ function renderClassics(){
 
 function renderSuggestions(){
   const c    = document.getElementById("content")
-  const list = applyFilters(DATA.suggestions||[])
+  const owned = new Set(DATA.owned_tmdb_ids||[])
+  const raw   = (DATA.suggestions||[]).filter(m => !owned.has(m.tmdb))
+  const list  = applyFilters(raw)
   if (!list.length){ c.innerHTML=emptyStateHTML("No suggestions available"); return }
   const { slice, btn } = _paginate(list, "suggestions")
   c.innerHTML = `
@@ -700,7 +723,14 @@ function renderNoMatch(){
   const list = DATA.tmdb_not_found||[]
   if (!list.length){ c.innerHTML=emptyStateHTML("All TMDB matches resolved 🎉"); return }
   c.innerHTML = `
-    <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">${list.length} movies with invalid TMDB metadata</p>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+      <p style="color:var(--text3);font-size:.78rem;margin:0">${list.length} movies with invalid TMDB metadata — failed lookups are retried automatically on next scan.</p>
+      <button onclick="rescan()"
+        style="flex-shrink:0;font-size:.72rem;padding:4px 12px;border-radius:6px;border:1px solid var(--border2);
+               background:var(--bg3);color:var(--text2);cursor:pointer;font-family:'DM Mono',monospace">
+        ↻ Retry now
+      </button>
+    </div>
     <div style="display:flex;flex-direction:column;gap:.4rem">
       ${list.map(m=>`
       <div class="meta-item">
