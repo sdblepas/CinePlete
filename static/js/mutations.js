@@ -291,6 +291,7 @@ async function ignoreFranchise(name, btn){
   await api("/api/ignore","POST",{kind:"franchise",value:name})
   if (!DATA._ignored_franchises) DATA._ignored_franchises=[]
   if (!DATA._ignored_franchises.includes(name)) DATA._ignored_franchises.push(name)
+  DATA.franchises = (DATA.franchises||[]).filter(f => f.name !== name)
   btn.closest(".mb-group").remove()
   updateFilterBar()
   toast(`"${name}" ignored`,"info")
