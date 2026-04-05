@@ -16,10 +16,14 @@ function posterCard(m, extraTag = "") {
     ? `<button class="btn-sm btn-radarr" style="opacity:.75" onclick="event.stopPropagation();addToRadarr4k(${tmdb},'${safeName}',this)">+ 4K</button>`
     : ""
   const overseerrBtn = CONFIG?.OVERSEERR?.OVERSEERR_ENABLED
-    ? `<button class="btn-sm btn-overseerr" onclick="event.stopPropagation();addToOverseerr(${tmdb},'${safeName}',this)">→ OS</button>`
+    ? (overseerrRequested?.has(tmdb)
+        ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
+        : `<button class="btn-sm btn-overseerr" onclick="event.stopPropagation();addToOverseerr(${tmdb},'${safeName}',this)">→ OS</button>`)
     : ""
   const jellyseerrBtn = CONFIG?.JELLYSEERR?.JELLYSEERR_ENABLED
-    ? `<button class="btn-sm btn-jellyseerr" onclick="event.stopPropagation();addToJellyseerr(${tmdb},'${safeName}',this)">→ JS</button>`
+    ? (jellyseerrRequested?.has(tmdb)
+        ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
+        : `<button class="btn-sm btn-jellyseerr" onclick="event.stopPropagation();addToJellyseerr(${tmdb},'${safeName}',this)">→ JS</button>`)
     : ""
 
   // Encode movie data on the button so add/remove toggles can update DATA without extra API calls

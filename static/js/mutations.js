@@ -257,13 +257,35 @@ async function addToRadarr4k(tmdb, title, btn){
   }
 }
 
+/* ── Seerr requested state (localStorage) ──────────────────── */
+
+function _makeSeerrStore(key) {
+  let _s = null
+  return {
+    load() {
+      if (!_s) {
+        try { _s = new Set(JSON.parse(localStorage.getItem(key) || "[]")) }
+        catch { _s = new Set() }
+      }
+      return _s
+    },
+    add(tmdb)  { this.load().add(tmdb);  this._save() },
+    has(tmdb)  { return this.load().has(tmdb) },
+    _save()    { try { localStorage.setItem(key, JSON.stringify([...this.load()])) } catch {} },
+  }
+}
+const overseerrRequested   = _makeSeerrStore("cp-overseerr-requested")
+const jellyseerrRequested  = _makeSeerrStore("cp-jellyseerr-requested")
+
 async function addToOverseerr(tmdb, title, btn){
   btn.disabled = true; btn.textContent = "…"
   const res = await api("/api/overseerr/add","POST",{tmdb,title})
   if (res.ok){
+    overseerrRequested.add(tmdb)
     btn.textContent = "✓ Requested"
     btn.className   = "btn-sm"
     btn.style.color = "var(--green)"
+    btn.disabled    = true
     toast(`${title} → Overseerr`,"success")
   } else {
     btn.textContent = "✗"; btn.disabled = false
@@ -275,9 +297,11 @@ async function addToJellyseerr(tmdb, title, btn){
   btn.disabled = true; btn.textContent = "…"
   const res = await api("/api/jellyseerr/add","POST",{tmdb,title})
   if (res.ok){
+    jellyseerrRequested.add(tmdb)
     btn.textContent = "✓ Requested"
     btn.className   = "btn-sm"
     btn.style.color = "var(--green)"
+    btn.disabled    = true
     toast(`${title} → Jellyseerr`,"success")
   } else {
     btn.textContent = "✗"; btn.disabled = false

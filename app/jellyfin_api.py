@@ -30,7 +30,7 @@ def _build_lib_cfg(lib_cfg):
     }
 
 
-def _jf_get(path: str, lib_cfg=None, params: dict = None) -> dict:
+def _jf_get(path: str, lib_cfg=None, params: dict = None, timeout: int = 120) -> dict:
     """Make an authenticated GET request to Jellyfin and return JSON."""
     lc = _build_lib_cfg(lib_cfg)
 
@@ -38,7 +38,7 @@ def _jf_get(path: str, lib_cfg=None, params: dict = None) -> dict:
     url     = lc["url"].rstrip("/") + path
 
     try:
-        r = requests.get(url, headers=headers, params=params or {}, timeout=30)
+        r = requests.get(url, headers=headers, params=params or {}, timeout=timeout)
         r.raise_for_status()
         return r.json()
     except requests.exceptions.ConnectionError as exc:

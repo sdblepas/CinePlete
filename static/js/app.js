@@ -85,6 +85,7 @@ function setActiveTab(tab){
   if (typeof _activeGroupFilter  !== "undefined") _activeGroupFilter  = ""
   if (typeof _activeGenreFilter  !== "undefined") _activeGenreFilter  = ""
   if (typeof _activeRatingFilter !== "undefined") _activeRatingFilter = 0
+  if (typeof _activeYearFilter   !== "undefined") _activeYearFilter   = ""
   if (typeof _resetPage          !== "undefined") _resetPage(tab)
   const sortEl = document.getElementById("sort")
   if (sortEl){

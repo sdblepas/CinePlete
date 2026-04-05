@@ -3,9 +3,44 @@
 ============================================================ */
 
 const GROUP_TABS = new Set(["franchises","directors","actors"])
-let _activeGroupFilter = ""
-let _activeGenreFilter = ""
+let _activeGroupFilter  = ""
+let _activeGenreFilter  = ""
 let _activeRatingFilter = 0   // 0 = no filter
+let _activeYearFilter   = ""  // mirrors yearFilter select, survives tab switches
+
+/* Navigate to a grouped tab (franchises/directors/actors) with a pre-set group
+   filter, bypassing setActiveTab which resets _activeGroupFilter. */
+function navigateToGroupTab(tab, groupName) {
+  ACTIVE_TAB          = tab
+  _activeGroupFilter  = groupName
+  _activeGenreFilter  = ""
+  _activeRatingFilter = 0
+  _activeYearFilter   = ""
+  if (typeof _resetPage !== "undefined") _resetPage(tab)
+  if (typeof clearSelection !== "undefined") clearSelection()
+  if (typeof closeSidebar   !== "undefined") closeSidebar()
+  setNavActive(tab)
+  render()
+}
+
+/* Navigate to suggestions with pre-set genre and/or year filters. */
+function navigateToSuggestions({ genreId = "", year = "" } = {}) {
+  ACTIVE_TAB          = "suggestions"
+  _activeGroupFilter  = ""
+  _activeGenreFilter  = genreId
+  _activeRatingFilter = 0
+  _activeYearFilter   = year
+  if (typeof _resetPage !== "undefined") _resetPage("suggestions")
+  if (typeof clearSelection !== "undefined") clearSelection()
+  if (typeof closeSidebar   !== "undefined") closeSidebar()
+  setNavActive("suggestions")
+  render()
+  // yearFilter is a DOM select rebuilt by updateFilterBar; restore after render
+  if (year) {
+    const yf = document.getElementById("yearFilter")
+    if (yf && yf.value !== year) { yf.value = year; render() }
+  }
+}
 
 /* Static TMDB genre ID map — stable, no API call needed */
 const GENRE_MAP = {
@@ -209,8 +244,8 @@ function onRatingFilterChange(val) {
 function _ratingSliderHtml(cur) {
   const label = cur > 0 ? `≥ ${parseFloat(cur).toFixed(1)} ⭐` : "Any ⭐"
   return `<div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
-    <input type="range" id="ratingFilter" min="0" max="9" step="0.5" value="${cur}"
-      style="width:80px;accent-color:var(--gold);cursor:pointer"
+    <input type="range" id="ratingFilter" min="0" max="10" step="0.5" value="${cur}"
+      style="width:90px;accent-color:var(--gold);cursor:pointer;touch-action:none"
       oninput="onRatingFilterChange(this.value)"/>
     <span id="ratingFilterLabel" style="font-size:.7rem;color:var(--gold);min-width:58px">${label}</span>
   </div>`
