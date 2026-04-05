@@ -391,15 +391,16 @@ def _analyze_actors(actors_map, plex_ids, tmdb, ignore_actors, ignore_movies, wi
             reverse=True,
         )
 
-        missing = []
+        missing   = []
+        have_list = []
         for m in films:
             mid = int(m.get("id"))
-            if mid in plex_ids or mid in ignore_movies:
+            if mid in ignore_movies:
                 continue
             release = (m.get("release_date") or "")[:10]
             if not release or release > date.today().isoformat():
                 continue
-            missing.append({
+            entry = {
                 "title":      m.get("title"),
                 "tmdb":       mid,
                 "year":       (m.get("release_date") or "")[:4] or None,
@@ -410,13 +411,18 @@ def _analyze_actors(actors_map, plex_ids, tmdb, ignore_actors, ignore_movies, wi
                 "votes":      m.get("vote_count", 0),
                 "rating":     m.get("vote_average", 0),
                 "wishlist":   mid in wishlist_movies,
-            })
-            if len(missing) >= max_per_actor:
-                break
+            }
+            if mid in plex_ids:
+                if len(have_list) < 10:
+                    have_list.append(entry)
+            else:
+                missing.append(entry)
+                if len(missing) >= max_per_actor:
+                    break
 
         if missing:
             actor_missing_total += len(missing)
-            actors.append({"name": actor, "missing": missing})
+            actors.append({"name": actor, "missing": missing, "have_list": have_list})
 
     actors = sorted(actors, key=lambda x: x["name"].lower())
     log.info(f"Actors analyzed: {len(actors)}")

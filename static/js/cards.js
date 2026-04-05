@@ -47,7 +47,8 @@ function posterCard(m, extraTag = "") {
   return `
   <div class="pc" data-tmdb="${tmdb}" onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
     <input type="checkbox" class="pc-check"
-      onclick="event.stopPropagation();toggleSelect(${tmdb},${mSafe.replace(/"/g,'&quot;')},this)"
+      data-movie="${mSafe.replace(/"/g,'&quot;')}"
+      onclick="event.stopPropagation();toggleSelect(${tmdb},${mSafe.replace(/"/g,'&quot;')},this,event)"
       title="Select"/>
     ${imgHtml}
     <div class="pc-info">
@@ -138,7 +139,8 @@ function lbPosterCard(m) {
     onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
     ${scoreBadge}
     <input type="checkbox" class="pc-check"
-      onclick="event.stopPropagation();toggleSelect(${tmdb},${mSafe.replace(/"/g,'&quot;')},this)"
+      data-movie="${mSafe.replace(/"/g,'&quot;')}"
+      onclick="event.stopPropagation();toggleSelect(${tmdb},${mSafe.replace(/"/g,'&quot;')},this,event)"
       title="Select"/>
     ${imgHtml}
     <div class="pc-info">

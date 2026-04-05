@@ -376,7 +376,7 @@ function renderDashboard(){
 
 /* ── Grouped list (franchises / directors / actors) ─────── */
 
-function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg }){
+function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg, showHave = false }){
   const c           = document.getElementById("content")
   const groupFilter = getGroupFilter()
   const sort        = getSort()
@@ -415,6 +415,18 @@ function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg 
     const groupTab = `${ACTIVE_TAB}-${name}`
     const { slice, btn: moreBtn } = _paginate(sorted, groupTab)
 
+    const haveList    = (showHave && g.have_list) ? g.have_list : []
+    const haveSection = haveList.length
+      ? `<details class="have-section">
+           <summary style="cursor:pointer;font-size:.73rem;color:var(--text3);margin:.5rem 0 .4rem;user-select:none">
+             ▸ In your library (${haveList.length})
+           </summary>
+           <div class="grid-posters" style="opacity:.45;pointer-events:none">
+             ${haveList.map(m => posterCard(m)).join("")}
+           </div>
+         </details>`
+      : ""
+
     html += `
     <div class="mb-group" style="margin-bottom:2rem">
       <div class="group-header">
@@ -429,6 +441,7 @@ function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg 
       </div>
       <div class="grid-posters">${slice.map(m=>posterCard(m)).join("")}</div>
       ${moreBtn}
+      ${haveSection}
     </div>`
   })
 
@@ -458,7 +471,8 @@ function renderDirectors(){
 function renderActors(){
   renderGroupedList({
     groups: DATA.actors||[], nameKey:"name", nameIcon:"🎭",
-    ignoreHandler:"ignoreActor", emptyMsg:"No actor suggestions found"
+    ignoreHandler:"ignoreActor", emptyMsg:"No actor suggestions found",
+    showHave: true,
   })
 }
 
