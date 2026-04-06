@@ -75,10 +75,11 @@ async function pollScanStatus(){
   try { s = await api("/api/scan/status") } catch(e){ return }
   renderScanProgress(s)
   if (s.running){
-    // Fetch latest partial results and re-render the active tab so
-    // completed sections appear as soon as they're written
+    // Always fetch and re-render while scan is running so completed
+    // sections appear as soon as they are written — do not gate on
+    // data.scanning which can be false between partial writes
     const data = await api("/api/results")
-    if (data && data.scanning) {
+    if (data) {
       DATA = data
       updateBadges()
       render()

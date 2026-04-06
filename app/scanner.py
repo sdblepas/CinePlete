@@ -651,7 +651,9 @@ def build():
 
     tmdb = TMDB(tmdb_api_key)
 
-    # Accumulated results dict — sections are filled in progressively
+    # Seed acc with previous results so pending sections show stale data
+    # rather than empty lists while they wait to be recomputed.
+    _prev = read_results() or {}
     acc = {
         "generated_at":      datetime.utcnow().isoformat() + "Z",
         "media_server":      plex_stats,
@@ -661,14 +663,17 @@ def build():
         "_ignored_franchises": list(ignore_franchises),
         "_ignored_directors":  list(ignore_directors),
         "_ignored_actors":     list(ignore_actors),
-        # sections start empty — filled as each step completes
-        "tmdb_not_found": [],
-        "franchises":     [], "franchise_completion": [],
-        "directors":      [],
-        "classics":       [],
-        "suggestions":    [],
-        "actors":         [],
-        "scores":         {}, "charts": {}, "wishlist":  [],
+        # carry previous results — each section overwrites when done
+        "tmdb_not_found": _prev.get("tmdb_not_found", []),
+        "franchises":          _prev.get("franchises", []),
+        "franchise_completion": _prev.get("franchise_completion", []),
+        "directors":           _prev.get("directors", []),
+        "classics":            _prev.get("classics", []),
+        "suggestions":         _prev.get("suggestions", []),
+        "actors":              _prev.get("actors", []),
+        "scores":              _prev.get("scores", {}),
+        "charts":              _prev.get("charts", {}),
+        "wishlist":            _prev.get("wishlist", []),
     }
     sections = {k: "pending" for k in _SECTION_KEYS}
     sections["library"] = "done"
