@@ -519,13 +519,14 @@ class TestBuildSuggestions(unittest.TestCase):
 
     def test_valid_suggestion_included_with_rec_score(self):
         tmdb = _make_tmdb()
-        # library movie 1 recommends 99; rec_fetched_ids has movie 2 which also recommends 99
+        # library movie 1 recommends 99; movie 2 was scored in a previous scan
+        # and its contribution is already persisted in rec_scores (new behaviour:
+        # scores are never rebuilt from cached HTTP responses, only from deltas)
         tmdb.recommendations.side_effect = lambda mid: {"results": [{"id": 99}]}
         tmdb.movie.return_value = _movie(99, release="2000-01-01")
-        # overrides with rec_fetched_ids=[2] so both 1 (newly fetched) and 2 (cached) recommend 99
         result = self._run(
             {1: "A"}, tmdb,
-            overrides={"rec_fetched_ids": [2]},
+            overrides={"rec_fetched_ids": [2], "rec_scores": {"99": 1}},
             min_score=2,
         )
         assert len(result) == 1
