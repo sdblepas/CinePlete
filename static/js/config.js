@@ -295,7 +295,8 @@ function _collectLibraries() {
     if (type === "plex") base.token   = cred
     else                 base.api_key = cred
     return base
-  })
+  // Drop placeholder entries that have never been filled in
+  }).filter(lib => lib.url)
 }
 
 function renderConfig(){
@@ -386,7 +387,7 @@ function renderConfig(){
         <div id="lib-list">
           ${((CONFIG.LIBRARIES||[]).length
             ? CONFIG.LIBRARIES
-            : [{type:"plex",enabled:true,label:"",url:"",token:"",library_name:"Movies",page_size:500,short_movie_limit:60}]
+            : [{type:"plex",enabled:false,label:"",url:"",token:"",library_name:"Movies",page_size:500,short_movie_limit:60}]
           ).map((lib, i) => _libEntryHtml(lib, i)).join("")}
         </div>
         <div style="display:flex;gap:.5rem;margin-top:.5rem">
