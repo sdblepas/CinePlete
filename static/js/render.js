@@ -481,9 +481,51 @@ function renderFranchises(){
   const c  = document.getElementById("content")
   if (st === "pending")   { c.innerHTML = _renderSectionPending("Franchises");           return }
   if (st === "computing") { c.innerHTML = _renderSectionComputing("Analyzing franchises…"); return }
+
+  const all        = DATA.franchises || []
+  const incomplete = all.filter(f => (f.missing||[]).length > 0)
+  const complete   = all.filter(f => (f.missing||[]).length === 0)
+
   renderGroupedList({
-    groups: DATA.franchises||[], nameKey:"name", nameIcon:"🎬",
+    groups: incomplete, nameKey:"name", nameIcon:"🎬",
     ignoreHandler:"ignoreFranchise", emptyMsg:"No missing franchise movies 🎉"
+  })
+
+  if (complete.length === 0) return
+
+  const sorted = [...complete].sort((a,b) => (a.name||"").localeCompare(b.name||""))
+  const pills  = sorted.map(f => `
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .7rem;
+                background:var(--bg2);border:1px solid var(--border2);border-radius:8px">
+      <span style="font-size:.8rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        🎬 ${escHtml(f.name)}
+      </span>
+      <span style="margin-left:auto;font-size:.72rem;color:#22c55e;font-weight:700;white-space:nowrap;flex-shrink:0">
+        ✓ ${f.have}/${f.total}
+      </span>
+    </div>`).join("")
+
+  c.innerHTML += `
+    <details class="completed-franchises-section" style="margin-top:2.5rem">
+      <summary style="cursor:pointer;user-select:none;list-style:none;display:flex;
+                      align-items:center;gap:.5rem;padding:.4rem 0;margin-bottom:.1rem">
+        <span class="cfs-chevron" style="font-size:.7rem;color:var(--text3);
+                                         transition:transform .2s;display:inline-block">▶</span>
+        <span style="font-size:.8rem;font-weight:700;color:#22c55e;letter-spacing:.03em">
+          Complete ✓
+        </span>
+        <span style="font-size:.78rem;color:var(--text3)">(${complete.length})</span>
+      </summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+                  gap:.45rem;margin-top:.6rem">
+        ${pills}
+      </div>
+    </details>`
+
+  // Rotate chevron when open
+  c.querySelector(".completed-franchises-section")?.addEventListener("toggle", function(){
+    const ch = this.querySelector(".cfs-chevron")
+    if (ch) ch.style.transform = this.open ? "rotate(90deg)" : ""
   })
 }
 

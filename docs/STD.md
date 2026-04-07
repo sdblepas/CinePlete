@@ -227,14 +227,13 @@ All show numeric values, not zero or NaN
 ---
 
 ### TC15 — Completed franchises visible
-> ⚠️ **TODO** — Feature not yet implemented (on backlog). Expected to fail.
-
 **Steps:**
 1. Navigate to Franchises tab
 2. Look for a "Complete ✓" section at the bottom
 
-**Expected:** Collapsed section showing franchises where all films are owned
-**Result:** ❌ Not yet implemented
+**Expected:** Collapsed `<details>` section showing franchises where all films are owned,
+each displaying franchise name + ✓ N/N badge in green. Clicking the summary expands the grid.
+**Result:** ___
 
 ---
 
@@ -598,7 +597,7 @@ All show numeric values, not zero or NaN
 | TC12 | Dashboard | Charts | ___ |
 | TC13 | Franchises | Missing films listed | ___ |
 | TC14 | Franchises | Ignore works | ___ |
-| TC15 | Franchises | Completed visible | ❌ TODO |
+| TC15 | Franchises | Completed visible | ___ |
 | TC16 | Directors | Listed | ___ |
 | TC17 | Directors | Ignore works | ___ |
 | TC18 | Actors | Listed | ___ |
