@@ -8,11 +8,30 @@ from app.config import load_config
 def _build_lib_cfg(lib_cfg):
     """Resolve lib_cfg — if None, fall back to legacy PLEX config section."""
     if lib_cfg is not None:
+        url = lib_cfg.get("url", "").strip()
+        if not url:
+            label = lib_cfg.get("label") or lib_cfg.get("library_name") or "Plex"
+            raise RuntimeError(
+                f"Plex library '{label}' has no URL configured — "
+                "please fill in the URL in Config."
+            )
+        token = lib_cfg.get("token", "").strip()
+        if not token:
+            label = lib_cfg.get("label") or lib_cfg.get("library_name") or "Plex"
+            raise RuntimeError(
+                f"Plex library '{label}' has no token configured — "
+                "please fill in the Plex token in Config."
+            )
         return lib_cfg
     cfg = load_config()
     plex = cfg["PLEX"]
+    url = plex.get("PLEX_URL", "").strip()
+    if not url:
+        raise RuntimeError(
+            "Plex URL is not configured — please fill in the Plex URL in Config."
+        )
     return {
-        "url": plex["PLEX_URL"],
+        "url": url,
         "token": plex["PLEX_TOKEN"],
         "library_name": plex["LIBRARY_NAME"],
         "page_size": int(plex.get("PLEX_PAGE_SIZE", 500)),

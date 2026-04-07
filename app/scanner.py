@@ -573,6 +573,27 @@ def build():
     _set_step(1, lib_labels,
               label=f"Scanning {len(enabled_libs)} librar{'y' if len(enabled_libs)==1 else 'ies'}")
 
+    # Validate each library's required fields before starting any threads
+    for lib in enabled_libs:
+        lib_type  = lib.get("type", "plex").lower()
+        lib_label = lib.get("label") or lib.get("library_name") or lib_type.capitalize()
+        missing   = []
+        if not lib.get("url", "").strip():
+            missing.append("URL")
+        if lib_type in ("jellyfin", "emby"):
+            if not lib.get("api_key", "").strip():
+                missing.append("API key")
+        else:
+            if not lib.get("token", "").strip():
+                missing.append("token")
+        if not lib.get("library_name", "").strip():
+            missing.append("library name")
+        if missing:
+            raise RuntimeError(
+                f"{lib_label} library is missing: {', '.join(missing)} — "
+                "please complete the library settings in Config."
+            )
+
     def _scan_one(lib):
         lib_type = lib.get("type", "plex").lower()
         label    = lib.get("label") or lib.get("library_name") or lib_type
