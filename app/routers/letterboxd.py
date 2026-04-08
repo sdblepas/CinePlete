@@ -154,7 +154,21 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> 
     try:
         root = ET.fromstring(content)
     except ET.ParseError:
-        return []
+        # FlareSolverr sometimes returns the Cloudflare HTML page instead of
+        # raw RSS XML. Try extracting film titles from the HTML before giving up.
+        html_text = content.decode("utf-8", errors="replace")
+        fallback = _parse_films_from_html(html_text)
+        if fallback:
+            log.debug(
+                f"Letterboxd: RSS XML parse failed for {rss_url} — "
+                f"extracted {len(fallback)} titles from HTML fallback"
+            )
+        else:
+            log.warning(
+                f"Letterboxd: RSS XML parse failed for {rss_url} and HTML "
+                "fallback found nothing — check the URL or FlareSolverr response"
+            )
+        return fallback
 
     def local(tag: str) -> str:
         return tag.split("}")[-1] if "}" in tag else tag
