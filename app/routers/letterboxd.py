@@ -178,6 +178,10 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> 
             web_content = _fetch_via_flaresolverr(web_url, flaresolverr)
             if web_content:
                 web_html = web_content.decode("utf-8", errors="replace")
+                log.debug(
+                    f"Letterboxd: web page response preview for {web_url}: "
+                    f"{web_html[:600]!r}"
+                )
                 fallback  = _parse_films_from_html(web_html)
                 if fallback:
                     log.debug(
