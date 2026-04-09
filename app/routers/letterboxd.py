@@ -69,9 +69,23 @@ def _fetch_via_flaresolverr(rss_url: str, flaresolverr_url: str) -> bytes | None
             timeout=70,
         )
         data = resp.json()
-        if data.get("status") == "ok":
+        status = data.get("status")
+        if status == "ok":
             content = data.get("solution", {}).get("response", "")
-            return content.encode("utf-8") if isinstance(content, str) else content
+            if not content:
+                log.debug(f"FlareSolverr: empty response body for {rss_url}")
+                return None
+            encoded = content.encode("utf-8") if isinstance(content, str) else content
+            log.debug(
+                f"FlareSolverr: got {len(encoded)} bytes for {rss_url} — "
+                f"preview: {encoded[:300]!r}"
+            )
+            return encoded
+        else:
+            log.debug(
+                f"FlareSolverr: non-ok status '{status}' for {rss_url} — "
+                f"message: {data.get('message','(none)')}"
+            )
     except Exception as e:
         log.debug(f"FlareSolverr error for {rss_url}: {e}")
     return None
