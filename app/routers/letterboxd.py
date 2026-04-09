@@ -90,22 +90,25 @@ def _fetch_via_flaresolverr(rss_url: str, flaresolverr_url: str) -> bytes | None
 
 def _parse_films_from_html(html_text: str) -> list[dict]:
     """
-    Extract film titles from Letterboxd HTML. Handles two formats:
+    Extract film slugs/titles from Letterboxd HTML. Handles three formats:
 
     1. RSS description HTML — absolute URLs with inline title text:
          <a href="https://letterboxd.com/film/slug/">Title</a>
 
-    2. List/watchlist page HTML — data-film-slug attributes on poster divs:
+    2. List page poster grid — data-film-slug attribute:
          <div data-film-slug="the-godfather" ...>
-       Slug is converted to an approximate title ("the godfather") which
-       is accurate enough for TMDB fuzzy search.
+
+    3. List page poster grid — data-target-link attribute (primary Letterboxd format):
+         <div data-target-link="/film/the-godfather/" ...>
+
+    Formats 2 and 3 convert slug → approximate title for TMDB fuzzy search.
     """
     import re
     skip = {"View the full list on Letterboxd", "here", "letterboxd.com"}
     seen: set = set()
     results = []
 
-    # Format 1: absolute film URLs (RSS description HTML)
+    # Format 1: absolute film URLs with visible title text (RSS description HTML)
     abs_pattern = re.compile(
         r'href="https://letterboxd\.com/film/([^/"]+)/"[^>]*>([^<]{1,120})</a>',
         re.IGNORECASE,
@@ -120,15 +123,62 @@ def _parse_films_from_html(html_text: str) -> list[dict]:
     if results:
         return results
 
-    # Format 2: data-film-slug attributes (list/watchlist page HTML)
-    slug_pattern = re.compile(r'data-film-slug="([a-z0-9][a-z0-9-]*)"', re.IGNORECASE)
+    # Format 2: data-film-slug attributes (poster divs on list/watchlist pages)
+    slug_pattern = re.compile(r'data-film-slug="([^"]+)"', re.IGNORECASE)
     for m in slug_pattern.finditer(html_text):
         slug = m.group(1)
         if slug not in seen:
             seen.add(slug)
             results.append({"title": slug.replace("-", " ")})
 
+    # Format 3: data-target-link="/film/slug/" (primary poster grid format)
+    target_pattern = re.compile(r'data-target-link="/film/([^/"]+)/"', re.IGNORECASE)
+    for m in target_pattern.finditer(html_text):
+        slug = m.group(1)
+        if slug not in seen:
+            seen.add(slug)
+            results.append({"title": slug.replace("-", " ")})
+
+    log.debug(f"_parse_films_from_html: extracted {len(results)} films")
     return results
+
+
+def _fetch_list_page_with_pagination(
+    list_url: str, first_page_html: str, flaresolverr: str
+) -> list[dict]:
+    """
+    Parse page 1 of a Letterboxd list page, then fetch pages 2..N if paginated.
+    Letterboxd shows max 100 films per page.
+    """
+    films = _parse_films_from_html(first_page_html)
+
+    import re
+    page_nums = re.findall(r'/page/(\d+)/', first_page_html)
+    if not page_nums:
+        return films
+
+    max_page = min(max(int(p) for p in page_nums), 20)  # safety cap at 20 pages
+    if max_page < 2:
+        return films
+
+    log.debug(f"Letterboxd: list has {max_page} pages, fetching pages 2-{max_page}")
+    base = list_url.rstrip("/")
+
+    for page in range(2, max_page + 1):
+        page_url     = f"{base}/page/{page}/"
+        page_content = _fetch_via_flaresolverr(page_url, flaresolverr)
+        if not page_content:
+            log.debug(f"Letterboxd: failed to fetch page {page}, stopping pagination")
+            break
+        page_html  = page_content.decode("utf-8", errors="replace")
+        page_films = _parse_films_from_html(page_html)
+        if not page_films:
+            log.debug(f"Letterboxd: page {page} returned 0 films, stopping")
+            break
+        log.debug(f"Letterboxd: page {page}/{max_page} → {len(page_films)} films")
+        films.extend(page_films)
+
+    return films
 
 
 def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> list[dict]:
@@ -168,13 +218,21 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> 
             rss_url,
             headers={"User-Agent": "Mozilla/5.0 (compatible; CinePlete/1.0)"},
             timeout=15,
-            allow_redirects=False,
+            allow_redirects=True,
         )
+        # Re-validate after redirect to guard against SSRF via open redirects
+        if resp.url != rss_url:
+            if err := _validate_url_for_fetch(resp.url):
+                log.warning(f"Letterboxd redirect blocked ({err}): {resp.url}")
+                return []
+
         if resp.status_code == 200:
             content = resp.content
         elif resp.status_code == 403 and flaresolverr:
             log.debug(f"Letterboxd: 403 on {rss_url}, retrying via FlareSolverr")
             content = _fetch_via_flaresolverr(rss_url, flaresolverr)
+        else:
+            log.debug(f"Letterboxd: HTTP {resp.status_code} for {rss_url}")
     except requests.exceptions.RequestException:
         if flaresolverr:
             content = _fetch_via_flaresolverr(rss_url, flaresolverr)
@@ -182,46 +240,47 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> 
     if not content:
         return []
 
-    try:
-        root = ET.fromstring(content)
-    except ET.ParseError:
-        # FlareSolverr's Chromium renders RSS/XML as a browser view rather than
-        # returning raw XML — ET.fromstring() fails as a result.
-        # Strategy 1: the rendered HTML might already contain film anchor links.
-        html_text = content.decode("utf-8", errors="replace")
-        fallback = _parse_films_from_html(html_text)
+    # Detect whether we have XML or HTML before attempting parse
+    content_str = content.decode("utf-8", errors="replace")
+    is_xml = "<rss" in content_str[:500].lower() or "<?xml" in content_str[:500].lower()
+
+    if not is_xml:
+        # FlareSolverr returned HTML (browser-rendered RSS or Cloudflare page).
+        # Strategy 1: RSS rendered HTML may contain film anchor links.
+        fallback = _parse_films_from_html(content_str)
         if fallback:
             log.debug(
-                f"Letterboxd: RSS XML parse failed for {rss_url} — "
-                f"extracted {len(fallback)} titles from rendered HTML"
+                f"Letterboxd: non-XML response for {rss_url} — "
+                f"extracted {len(fallback)} titles from HTML"
             )
             return fallback
 
-        # Strategy 2: fetch the equivalent web page (strip /rss/) via
-        # FlareSolverr — the list page has <a href="/film/slug/"> links
-        # that _parse_films_from_html can reliably extract.
+        # Strategy 2: fetch the list web page and parse with pagination support.
         if flaresolverr and rss_url.endswith("/rss/"):
-            web_url = rss_url[: -len("rss/")]   # e.g. .../list/my-list/
-            log.debug(
-                f"Letterboxd: rendered HTML had no films — "
-                f"retrying via web page {web_url}"
-            )
+            web_url     = rss_url[: -len("rss/")]
+            log.debug(f"Letterboxd: no films in HTML — fetching list page {web_url}")
             web_content = _fetch_via_flaresolverr(web_url, flaresolverr)
             if web_content:
                 web_html = web_content.decode("utf-8", errors="replace")
-                fallback  = _parse_films_from_html(web_html)
-                if fallback:
+                films    = _fetch_list_page_with_pagination(web_url, web_html, flaresolverr)
+                if films:
                     log.debug(
-                        f"Letterboxd: web page fallback extracted "
-                        f"{len(fallback)} titles from {web_url}"
+                        f"Letterboxd: list page fallback extracted "
+                        f"{len(films)} titles from {web_url}"
                     )
-                    return fallback
+                    return films
 
         log.warning(
             f"Letterboxd: all fetch strategies failed for {rss_url} — "
-            "RSS parse error and no film links found in HTML or web page fallback"
+            "no film links found in RSS HTML or list page fallback"
         )
         return []
+
+    try:
+        root = ET.fromstring(content)
+    except ET.ParseError:
+        log.warning(f"Letterboxd: XML parse error for {rss_url}")
+        return _parse_films_from_html(content_str)
 
     def local(tag: str) -> str:
         return tag.split("}")[-1] if "}" in tag else tag
