@@ -530,7 +530,6 @@ def letterboxd_add_url(payload: dict = Body(...)):
     if url not in ov["letterboxd_urls"]:
         ov["letterboxd_urls"].append(url)
         save_json(OVERRIDES_FILE, ov)
-        _lb_start_refresh()
     return {"ok": True}
 
 
@@ -542,7 +541,6 @@ def letterboxd_remove_url(payload: dict = Body(...)):
     if url in urls:
         urls.remove(url)
         save_json(OVERRIDES_FILE, ov)
-        _lb_start_refresh()
     return {"ok": True}
 
 
