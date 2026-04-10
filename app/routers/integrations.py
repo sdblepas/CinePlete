@@ -25,12 +25,20 @@ router = APIRouter()
 # Radarr helpers
 # --------------------------------------------------
 
-def _radarr_post(cfg_section: dict, prefix: str, tmdb_id: int, title: str) -> dict:
-    """Shared logic for posting a movie to any Radarr instance."""
+def _radarr_post(
+    cfg_section: dict,
+    prefix: str,
+    tmdb_id: int,
+    title: str,
+    quality_override: int | None = None,
+    root_override: str | None = None,
+) -> dict:
+    """Shared logic for posting a movie to any Radarr instance.
+    quality_override and root_override, when provided, take precedence over config."""
     url       = str(cfg_section.get(f"{prefix}_URL", "")).rstrip("/")
     api_key   = str(cfg_section.get(f"{prefix}_API_KEY", "")).strip()
-    root      = str(cfg_section.get(f"{prefix}_ROOT_FOLDER_PATH", ""))
-    quality   = int(cfg_section.get(f"{prefix}_QUALITY_PROFILE_ID", 6))
+    root      = root_override if root_override is not None else str(cfg_section.get(f"{prefix}_ROOT_FOLDER_PATH", ""))
+    quality   = quality_override if quality_override is not None else int(cfg_section.get(f"{prefix}_QUALITY_PROFILE_ID", 6))
     monitored = bool(cfg_section.get(f"{prefix}_MONITORED", True))
     search    = bool(cfg_section.get(f"{prefix}_SEARCH_ON_ADD", False))
 
@@ -105,24 +113,70 @@ def radarr_profiles(instance: str = Query(default="primary")):
     return {"ok": True, "profiles": profiles}
 
 
+@router.get("/api/radarr/rootfolders")
+def radarr_rootfolders(instance: str = Query(default="primary")):
+    """Fetch root folders from a Radarr instance for the per-item picker."""
+    cfg = load_config()
+    if instance == "4k":
+        section = cfg.get("RADARR_4K", {})
+        url = str(section.get("RADARR_4K_URL", "")).rstrip("/")
+        key = str(section.get("RADARR_4K_API_KEY", "")).strip()
+    else:
+        section = cfg.get("RADARR", {})
+        url = str(section.get("RADARR_URL", "")).rstrip("/")
+        key = str(section.get("RADARR_API_KEY", "")).strip()
+
+    if not url or not key:
+        return {"ok": False, "error": "URL and API key required"}
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return {"ok": False, "error": "Invalid Radarr URL"}
+
+    try:
+        r = requests.get(
+            f"{url}/api/v3/rootfolder",
+            headers={"X-Api-Key": key},
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        return {"ok": False, "error": str(e)}
+
+    if r.status_code == 401:
+        return {"ok": False, "error": "Invalid API key"}
+    if r.status_code != 200:
+        return {"ok": False, "error": f"HTTP {r.status_code}"}
+
+    folders = [{"path": f["path"], "freeSpace": f.get("freeSpace", 0)} for f in r.json()]
+    return {"ok": True, "folders": folders}
+
+
 @router.post("/api/radarr/add")
 def radarr_add(payload: dict = Body(...), instance: str = Query(default="primary")):
     tmdb_id = _parse_tmdb_id(payload.get("tmdb"))
     if tmdb_id is None:
         return {"ok": False, "error": "Invalid TMDB ID"}
-    title = str(payload.get("title", ""))
-    cfg   = load_config()
+    title            = str(payload.get("title", ""))
+    quality_override = payload.get("qualityProfileId")
+    root_override    = payload.get("rootFolderPath")
+    cfg              = load_config()
+
+    if quality_override is not None:
+        try:
+            quality_override = int(quality_override)
+        except (ValueError, TypeError):
+            quality_override = None
 
     if instance == "4k":
         section = cfg.get("RADARR_4K", {})
         if not section.get("RADARR_4K_ENABLED"):
             return {"ok": False, "error": "Radarr 4K disabled"}
-        return _radarr_post(section, "RADARR_4K", tmdb_id, title)
+        return _radarr_post(section, "RADARR_4K", tmdb_id, title, quality_override, root_override)
 
     section = cfg.get("RADARR", {})
     if not section.get("RADARR_ENABLED"):
         return {"ok": False, "error": "Radarr disabled"}
-    return _radarr_post(section, "RADARR", tmdb_id, title)
+    return _radarr_post(section, "RADARR", tmdb_id, title, quality_override, root_override)
 
 
 @router.get("/api/radarr/status")

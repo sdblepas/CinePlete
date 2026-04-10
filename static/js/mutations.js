@@ -267,31 +267,137 @@ async function unignoreMovie(tmdb, title, btn) {
 
 /* ── Integration actions ────────────────────────────────────── */
 
-async function addToRadarr(tmdb, title, btn){
-  btn.disabled = true; btn.textContent = "…"
-  const res = await api("/api/radarr/add","POST",{tmdb,title})
-  if (res.ok){
-    btn.textContent = "✓ In Radarr"
+// Cache Radarr picker data (profiles + root folders) per instance to avoid re-fetching
+const _radarrPickerCache = {}
+
+async function _getRadarrPickerData(instance) {
+  if (_radarrPickerCache[instance]) return _radarrPickerCache[instance]
+  const inst = instance === "4k" ? "4k" : "primary"
+  const [pRes, rRes] = await Promise.all([
+    api(`/api/radarr/profiles?instance=${inst}`),
+    api(`/api/radarr/rootfolders?instance=${inst}`),
+  ])
+  const data = {
+    profiles: pRes.ok  ? pRes.profiles : [],
+    folders:  rRes.ok  ? rRes.folders  : [],
+  }
+  _radarrPickerCache[instance] = data
+  return data
+}
+
+function _showRadarrPicker(tmdb, title, btn, instance) {
+  // Build modal overlay
+  const overlay = document.createElement("div")
+  overlay.id = "radarrPickerOverlay"
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;
+    display:flex;align-items:center;justify-content:center;padding:1rem`
+
+  const data    = _radarrPickerCache[instance] || { profiles: [], folders: [] }
+  const label   = instance === "4k" ? "Radarr 4K" : "Radarr"
+  const cfgQ    = instance === "4k"
+    ? CONFIG?.RADARR_4K?.RADARR_4K_QUALITY_PROFILE_ID
+    : CONFIG?.RADARR?.RADARR_QUALITY_PROFILE_ID
+  const cfgRoot = instance === "4k"
+    ? CONFIG?.RADARR_4K?.RADARR_4K_ROOT_FOLDER_PATH
+    : CONFIG?.RADARR?.RADARR_ROOT_FOLDER_PATH
+
+  const profileOpts = data.profiles.map(p =>
+    `<option value="${p.id}" ${p.id === cfgQ ? "selected" : ""}>${p.name}</option>`
+  ).join("")
+
+  const folderOpts = data.folders.map(f => {
+    const free = f.freeSpace ? ` (${Math.round(f.freeSpace/1073741824)}GB free)` : ""
+    return `<option value="${escHtml(f.path)}" ${f.path === cfgRoot ? "selected" : ""}>${escHtml(f.path)}${free}</option>`
+  }).join("")
+
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;
+                padding:1.5rem;min-width:320px;max-width:480px;width:100%">
+      <div style="font-size:.85rem;font-weight:600;color:var(--text);margin-bottom:1rem">
+        Add to ${label}
+        <span style="font-size:.72rem;font-weight:400;color:var(--text3);display:block;margin-top:.2rem">
+          ${escHtml(title)}
+        </span>
+      </div>
+      ${data.profiles.length > 1 ? `
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.72rem;color:var(--text3);display:block;margin-bottom:.3rem">Quality Profile</label>
+        <select id="rpQuality" style="width:100%;background:var(--bg3);border:1px solid var(--border2);
+          border-radius:8px;color:var(--text);font-size:.8rem;padding:.4rem .6rem">
+          ${profileOpts}
+        </select>
+      </div>` : `<input type="hidden" id="rpQuality" value="${cfgQ||""}">`}
+      ${data.folders.length > 1 ? `
+      <div style="margin-bottom:1rem">
+        <label style="font-size:.72rem;color:var(--text3);display:block;margin-bottom:.3rem">Root Folder</label>
+        <select id="rpFolder" style="width:100%;background:var(--bg3);border:1px solid var(--border2);
+          border-radius:8px;color:var(--text);font-size:.8rem;padding:.4rem .6rem">
+          ${folderOpts}
+        </select>
+      </div>` : `<input type="hidden" id="rpFolder" value="${escHtml(cfgRoot||"")}">`}
+      <div style="display:flex;gap:.5rem;justify-content:flex-end">
+        <button onclick="document.getElementById('radarrPickerOverlay').remove()"
+          style="padding:6px 16px;border-radius:7px;border:1px solid var(--border2);
+                 background:none;color:var(--text2);cursor:pointer;font-size:.78rem">Cancel</button>
+        <button id="rpConfirm"
+          style="padding:6px 16px;border-radius:7px;border:1px solid #7B2FBE;
+                 background:#7B2FBE;color:#fff;cursor:pointer;font-size:.78rem;font-weight:600">
+          Add to ${label}
+        </button>
+      </div>
+    </div>`
+
+  document.body.appendChild(overlay)
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove() })
+
+  document.getElementById("rpConfirm").addEventListener("click", async () => {
+    const qualityProfileId = parseInt(document.getElementById("rpQuality")?.value) || null
+    const rootFolderPath   = document.getElementById("rpFolder")?.value || null
+    overlay.remove()
+    await _doAddToRadarr(tmdb, title, btn, instance, qualityProfileId, rootFolderPath)
+  })
+}
+
+async function _doAddToRadarr(tmdb, title, btn, instance, qualityProfileId, rootFolderPath) {
+  const inst    = instance === "4k" ? "?instance=4k" : ""
+  const payload = { tmdb, title }
+  if (qualityProfileId) payload.qualityProfileId = qualityProfileId
+  if (rootFolderPath)   payload.rootFolderPath   = rootFolderPath
+
+  const res = await api(`/api/radarr/add${inst}`, "POST", payload)
+  const label = instance === "4k" ? "4K" : "Radarr"
+  if (res.ok) {
+    btn.textContent = instance === "4k" ? "✓ In 4K" : "✓ In Radarr"
     btn.className   = "btn-sm"
     btn.style.color = "var(--green)"
-    toast(`${title} sent to Radarr`,"success")
+    toast(`${title} sent to ${label}`, "success")
   } else {
     btn.textContent = "✗ Error"; btn.disabled = false
-    toast(`Radarr: ${res.error||"unknown error"}`,"error")
+    toast(`${label}: ${res.error || "unknown error"}`, "error")
   }
 }
 
-async function addToRadarr4k(tmdb, title, btn){
+async function addToRadarr(tmdb, title, btn) {
   btn.disabled = true; btn.textContent = "…"
-  const res = await api("/api/radarr/add?instance=4k","POST",{tmdb,title})
-  if (res.ok){
-    btn.textContent = "✓ In 4K"
-    btn.className   = "btn-sm"
-    btn.style.color = "var(--green)"
-    toast(`${title} sent to Radarr 4K`,"success")
+  const data = await _getRadarrPickerData("primary")
+  // Show picker only when there's a real choice to make
+  if (data.profiles.length > 1 || data.folders.length > 1) {
+    btn.disabled = false; btn.textContent = "+ Radarr"
+    _showRadarrPicker(tmdb, title, btn, "primary")
   } else {
-    btn.textContent = "✗ 4K"; btn.disabled = false
-    toast(`Radarr 4K: ${res.error||"unknown error"}`,"error")
+    await _doAddToRadarr(tmdb, title, btn, "primary", null, null)
+  }
+}
+
+async function addToRadarr4k(tmdb, title, btn) {
+  btn.disabled = true; btn.textContent = "…"
+  const data = await _getRadarrPickerData("4k")
+  if (data.profiles.length > 1 || data.folders.length > 1) {
+    btn.disabled = false; btn.textContent = "+ 4K"
+    _showRadarrPicker(tmdb, title, btn, "4k")
+  } else {
+    await _doAddToRadarr(tmdb, title, btn, "4k", null, null)
   }
 }
 

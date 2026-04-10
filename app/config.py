@@ -108,6 +108,9 @@ DEFAULT_CONFIG = {
     "FLARESOLVERR": {
         "FLARESOLVERR_URL": "",   # e.g. http://flaresolverr:8191
     },
+    "MDBLIST": {
+        "MDBLIST_API_KEY": "",    # free key from mdblist.com/preferences/#api
+    },
     "AUTH": {
         # "None" | "Forms" | "DisabledForLocalAddresses"
         "AUTH_METHOD": "None",

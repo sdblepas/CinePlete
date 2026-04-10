@@ -530,6 +530,12 @@ function renderConfig(){
         ${hint("e.g. http://flaresolverr:8191 — used to bypass Cloudflare when fetching Letterboxd lists.")}
       </div>
 
+      <div class="form-section">
+        ${sec('MDBList <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>', svcBadge('MDBLIST','#10B981'))}
+        ${field("cfg_mdblist_key", "MDBList API Key", (cfg.MDBLIST||{}).MDBLIST_API_KEY||"", "password")}
+        ${hint('Free API key from <a href="https://mdblist.com/preferences/#api" target="_blank" style="color:var(--gold)">mdblist.com/preferences/#api</a> — required to fetch MDBList lists in the Lists tab.')}
+      </div>
+
       <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
       <div id="cfgStatus" style="font-size:.75rem;color:var(--text3);margin-top:.6rem;text-align:center"></div>
     </div>
@@ -647,6 +653,9 @@ async function saveConfig(){
     },
     FLARESOLVERR:{
       FLARESOLVERR_URL: v("cfg_flaresolverr_url"),
+    },
+    MDBLIST:{
+      MDBLIST_API_KEY: v("cfg_mdblist_key"),
     },
   }
 

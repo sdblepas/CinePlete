@@ -343,18 +343,83 @@ def _fetch_letterboxd_rss(url: str, _depth: int = 0, flaresolverr: str = "") -> 
     return movies[:_MAX_MOVIES_PER_FEED]
 
 
-def _validate_letterboxd_url(url: str):
-    """Return (cleaned_url, error_string_or_None)."""
+def _fetch_mdblist(url: str, api_key: str) -> list[dict]:
+    """
+    Fetch movies from an MDBList public list URL.
+    URL format: https://mdblist.com/lists/{username}/{slug}
+
+    Returns [{"tmdb_id": int}, ...] — TMDB IDs come directly from the API,
+    no fuzzy search needed.
+    """
+    parsed = urlparse(url)
+    parts  = [p for p in parsed.path.strip("/").split("/") if p]
+    # Expected: ["lists", username, slug]
+    if len(parts) < 3 or parts[0] != "lists":
+        log.warning(f"MDBList: cannot parse username/slug from URL: {url}")
+        return []
+
+    username = parts[1]
+    slug     = parts[2]
+    endpoint = f"https://api.mdblist.com/lists/{username}/{slug}/items/movie"
+
+    movies: list[dict] = []
+    offset  = 0
+    limit   = 100
+
+    while True:
+        try:
+            resp = requests.get(
+                endpoint,
+                params={"apikey": api_key, "limit": limit, "offset": offset},
+                timeout=15,
+            )
+        except requests.exceptions.RequestException as e:
+            log.warning(f"MDBList: request failed for {url}: {e}")
+            break
+
+        if resp.status_code == 429:
+            log.warning(f"MDBList: daily API limit exceeded for {url}")
+            break
+        if resp.status_code != 200:
+            log.warning(f"MDBList: HTTP {resp.status_code} for {url}")
+            break
+
+        data  = resp.json()
+        batch = data.get("movies", [])
+        for item in batch:
+            tmdb_id = item.get("ids", {}).get("tmdb")
+            if tmdb_id:
+                movies.append({"tmdb_id": int(tmdb_id)})
+
+        has_more = resp.headers.get("X-Has-More", "false").lower() == "true"
+        log.debug(f"MDBList: fetched {len(batch)} items (offset={offset}, has_more={has_more})")
+        if not has_more or not batch:
+            break
+        offset += limit
+
+    log.debug(f"MDBList: {len(movies)} movies from {url}")
+    return movies
+
+
+def _validate_list_url(url: str):
+    """Return (cleaned_url, error_string_or_None). Accepts Letterboxd and MDBList URLs."""
     url = url.strip()
     if not url:
         return None, "URL is required"
+    # Add scheme if missing
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "https://" + url
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return None, "Invalid URL"
     host = parsed.netloc.lower().replace("www.", "")
-    if "letterboxd.com" not in host:
-        return None, "Only Letterboxd URLs are supported"
+    if "letterboxd.com" not in host and "mdblist.com" not in host:
+        return None, "Only Letterboxd and MDBList URLs are supported"
     return url, None
+
+
+# Keep backward-compatible alias
+_validate_letterboxd_url = _validate_list_url
 
 
 def _lb_do_refresh() -> None:
@@ -363,9 +428,10 @@ def _lb_do_refresh() -> None:
     try:
         from app.tmdb import TMDB
 
-        cfg          = load_config()
-        api_key      = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
-        flaresolverr = cfg.get("FLARESOLVERR", {}).get("FLARESOLVERR_URL", "").rstrip("/")
+        cfg           = load_config()
+        api_key       = cfg.get("TMDB", {}).get("TMDB_API_KEY", "")
+        flaresolverr  = cfg.get("FLARESOLVERR", {}).get("FLARESOLVERR_URL", "").rstrip("/")
+        mdblist_key   = cfg.get("MDBLIST", {}).get("MDBLIST_API_KEY", "").strip()
         if not api_key:
             log.warning("Letterboxd refresh skipped — TMDB API key not configured")
             return
@@ -392,7 +458,17 @@ def _lb_do_refresh() -> None:
         owned_count: int             = 0
 
         for lb_url in urls:
-            raw      = _fetch_letterboxd_rss(lb_url, flaresolverr=flaresolverr)
+            # Route to the correct fetcher based on URL domain
+            host = urlparse(lb_url).netloc.lower().replace("www.", "")
+            if "mdblist.com" in host:
+                if not mdblist_key:
+                    log.warning(f"MDBList: API key not configured — skipping {lb_url}")
+                    raw = []
+                else:
+                    raw = _fetch_mdblist(lb_url, mdblist_key)
+            else:
+                raw = _fetch_letterboxd_rss(lb_url, flaresolverr=flaresolverr)
+
             seen:set = set()
             resolved = 0
             for item in raw:
@@ -417,7 +493,7 @@ def _lb_do_refresh() -> None:
 
             per_url_ids[lb_url] = list(seen)
             url_status.append({"url": lb_url, "raw": len(raw), "resolved": resolved})
-            log.debug(f"Letterboxd refresh: {lb_url} → {len(raw)} raw, {resolved} resolved")
+            log.debug(f"Lists refresh: {lb_url} → {len(raw)} raw, {resolved} resolved")
 
             # Rebuild movie list from all URLs processed so far and write to cache.
             # This lets the UI show movies progressively rather than waiting for all URLs.
@@ -447,7 +523,7 @@ def _lb_do_refresh() -> None:
             log.debug(f"Letterboxd: partial cache written — {len(movies)} movies so far")
 
         log.info(
-            f"Letterboxd refresh complete: {len(movies)} movies "
+            f"Lists refresh complete: {len(movies)} movies "
             f"(owned filtered: {owned_count})"
         )
 
@@ -535,7 +611,7 @@ def letterboxd_get_urls():
 
 @router.post("/api/letterboxd/urls")
 def letterboxd_add_url(payload: dict = Body(...)):
-    url, err = _validate_letterboxd_url(str(payload.get("url", "")))
+    url, err = _validate_list_url(str(payload.get("url", "")))
     if err:
         return {"ok": False, "error": err}
     ov = load_json(OVERRIDES_FILE)

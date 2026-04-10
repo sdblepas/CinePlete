@@ -664,7 +664,7 @@ function _lbUrlManager(savedUrls, moviesRes) {
                 padding:1rem 1.2rem;margin-bottom:1.5rem">
       <div style="font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
                   color:var(--text3);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
-        Letterboxd Lists
+        Lists
         ${stats}
         ${freshness}
         <button onclick="triggerLbRefresh()"
@@ -675,7 +675,7 @@ function _lbUrlManager(savedUrls, moviesRes) {
       <div style="display:flex;flex-direction:column;gap:.35rem">
         <div style="display:flex;gap:.5rem;align-items:center">
           <input id="lbUrlInput" type="url"
-            placeholder="e.g. letterboxd.com/you/watchlist/ or /list/my-list/"
+            placeholder="e.g. letterboxd.com/you/watchlist/ or mdblist.com/lists/user/slug/"
             style="flex:1;min-width:0;padding:6px 10px;border-radius:7px;border:1px solid var(--border2);
                    background:var(--bg3);color:var(--text);font-size:.78rem;font-family:'DM Mono',monospace"
             onkeydown="if(event.key==='Enter')addLbUrl(this)"/>
@@ -687,11 +687,11 @@ function _lbUrlManager(savedUrls, moviesRes) {
           </button>
         </div>
         <p style="color:var(--text3);font-size:.7rem;margin:0">
-          Supports watchlists, named lists, diary feeds and profile RSS.
+          Supports <strong style="color:var(--text2)">Letterboxd</strong> watchlists, named lists, diary feeds and profile RSS —
+          and <strong style="color:var(--text2)">MDBList</strong> lists (requires an MDBList API key in Config).
           E.g. <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/watchlist/</code> ·
           <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/list/best-of-2024/</code> ·
-          <code style="color:var(--gold);font-size:.68rem">letterboxd.com/you/rss/</code>.
-          Profile RSS feeds from curators are auto-expanded into their individual lists.
+          <code style="color:var(--gold);font-size:.68rem">mdblist.com/lists/user/slug/</code>.
           All lists must be public.
         </p>
       </div>
