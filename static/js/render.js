@@ -636,14 +636,7 @@ function renderSuggestions(){
     <p style="color:var(--text3);font-size:.78rem;margin-bottom:.6rem">${list.length} films recommended by your library</p>
     ${_genrePills(list)}
     ${_addAllBtn(list)}
-    <div class="grid-posters">${slice.map(m => {
-      const srcTip = (m.sources||[]).length
-        ? `title="Because you own: ${escHtml((m.sources||[]).join(", "))}"` : ""
-      const badge = m.rec_score
-        ? `<span ${srcTip} style="color:var(--gold);font-size:.6rem;cursor:${srcTip?"help":"default"}">⚡${m.rec_score}</span>`
-        : ""
-      return posterCard(m, badge)
-    }).join("")}</div>${btn}`
+    <div class="grid-posters">${slice.map(m => suggestionCard(m)).join("")}</div>${btn}`
 }
 
 /* ── Wishlist ────────────────────────────────────────────── */
