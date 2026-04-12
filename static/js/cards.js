@@ -208,7 +208,7 @@ function suggestionCard(m) {
   const sourcesLine = sources.length
     ? `<div style="font-size:.6rem;color:rgba(255,255,255,.55);
                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-         because: ${sources.map(s => escHtml(s)).join(" · ")}
+         from: ${sources.map(s => escHtml(s)).join(" · ")}
        </div>`
     : ""
 
