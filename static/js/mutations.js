@@ -141,6 +141,39 @@ async function batchAddToRadarr() {
   clearSelection()
 }
 
+/* Add every movie in the provided array to Radarr (uses picker once if needed) */
+async function addAllToRadarr(movies) {
+  if (!CONFIG?.RADARR?.RADARR_ENABLED) { toast("Radarr not enabled", "error"); return }
+  if (!movies?.length) { toast("No movies to add", "gold"); return }
+
+  // Get picker data once — show modal only if there's a real choice
+  let qualityProfileId = null
+  let rootFolderPath   = null
+  try {
+    const d = await _getRadarrPickerData("primary")
+    if (d.profiles.length > 1 || d.folders.length > 1) {
+      // Show picker once for the whole batch; wait for user choice via callback
+      const choice = await new Promise(resolve => {
+        _showRadarrPicker(null, `${movies.length} movies`, null, "primary", resolve)
+      })
+      if (!choice) return   // user cancelled
+      qualityProfileId = choice.qualityProfileId
+      rootFolderPath   = choice.rootFolderPath
+    }
+  } catch (e) { /* Radarr unreachable — fall through with no overrides */ }
+
+  toast(`Adding ${movies.length} movies to Radarr…`, "gold")
+  let ok = 0, fail = 0
+  for (const m of movies) {
+    const payload = { tmdb: m.tmdb, title: m.title }
+    if (qualityProfileId) payload.qualityProfileId = qualityProfileId
+    if (rootFolderPath)   payload.rootFolderPath   = rootFolderPath
+    const res = await api("/api/radarr/add", "POST", payload)
+    res.ok ? ok++ : fail++
+  }
+  toast(`Radarr: ${ok} added${fail ? `, ${fail} failed` : ""}`, ok ? "success" : "error")
+}
+
 async function batchAddToWishlist() {
   const n = _selected.size
   for (const [tmdb, m] of _selected) {
@@ -285,7 +318,9 @@ async function _getRadarrPickerData(instance) {
   return data
 }
 
-function _showRadarrPicker(tmdb, title, btn, instance) {
+/* callback (optional): if provided, called with {qualityProfileId, rootFolderPath} on confirm
+   or null on cancel — used by addAllToRadarr for batch mode. */
+function _showRadarrPicker(tmdb, title, btn, instance, callback = null) {
   // Build modal overlay
   const overlay = document.createElement("div")
   overlay.id = "radarrPickerOverlay"
@@ -337,7 +372,7 @@ function _showRadarrPicker(tmdb, title, btn, instance) {
         </select>
       </div>` : `<input type="hidden" id="rpFolder" value="${escHtml(cfgRoot||"")}">`}
       <div style="display:flex;gap:.5rem;justify-content:flex-end">
-        <button onclick="document.getElementById('radarrPickerOverlay').remove()"
+        <button id="rpCancel"
           style="padding:6px 16px;border-radius:7px;border:1px solid var(--border2);
                  background:none;color:var(--text2);cursor:pointer;font-size:.78rem">Cancel</button>
         <button id="rpConfirm"
@@ -349,13 +384,19 @@ function _showRadarrPicker(tmdb, title, btn, instance) {
     </div>`
 
   document.body.appendChild(overlay)
-  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove() })
+  const _dismiss = (result) => { overlay.remove(); if (callback) callback(result) }
+  overlay.addEventListener("click", e => { if (e.target === overlay) _dismiss(null) })
+  document.getElementById("rpCancel").addEventListener("click", () => _dismiss(null))
 
   document.getElementById("rpConfirm").addEventListener("click", async () => {
     const qualityProfileId = parseInt(document.getElementById("rpQuality")?.value) || null
     const rootFolderPath   = document.getElementById("rpFolder")?.value || null
     overlay.remove()
-    await _doAddToRadarr(tmdb, title, btn, instance, qualityProfileId, rootFolderPath)
+    if (callback) {
+      callback({ qualityProfileId, rootFolderPath })
+    } else {
+      await _doAddToRadarr(tmdb, title, btn, instance, qualityProfileId, rootFolderPath)
+    }
   })
 }
 

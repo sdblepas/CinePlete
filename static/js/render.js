@@ -558,6 +558,51 @@ function renderActors(){
 
 /* ── Classics ────────────────────────────────────────────── */
 
+/* ── Shared grid helpers ─────────────────────────────────── */
+
+// Holds the current tab's filtered movie list so _addAllBtn onclick can reference it
+let _tabAllMovies = []
+
+/* Genre pills — shows genres present in `movies`, clicking filters/unfilters */
+function _genrePills(movies) {
+  if (!movies.length) return ""
+  const counts = {}
+  for (const m of movies)
+    for (const gid of (m.genre_ids || []))
+      counts[gid] = (counts[gid] || 0) + 1
+  if (!Object.keys(counts).length) return ""
+  const active = getGenreFilter()
+  const pills = Object.entries(counts)
+    .filter(([id]) => GENRE_MAP[id])
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, cnt]) => {
+      const on = String(id) === String(active)
+      return `<button onclick="onGenreFilterChange(${on ? "''" : id})"
+        style="padding:3px 10px;border-radius:20px;
+               border:1px solid ${on ? "var(--gold)" : "var(--border2)"};
+               background:${on ? "rgba(255,197,61,.12)" : "var(--bg3)"};
+               color:${on ? "var(--gold)" : "var(--text3)"};
+               font-size:.68rem;cursor:pointer;white-space:nowrap;
+               font-family:'DM Mono',monospace;line-height:1.6"
+        >${GENRE_MAP[id]}<span style="opacity:.55;margin-left:.3rem">${cnt}</span></button>`
+    }).join("")
+  return `<div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.9rem">${pills}</div>`
+}
+
+/* "Add all X to Radarr" button — only rendered when Radarr is enabled */
+function _addAllBtn(movies) {
+  if (!CONFIG?.RADARR?.RADARR_ENABLED || !movies.length) return ""
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
+    <button onclick="addAllToRadarr(_tabAllMovies)"
+      style="padding:5px 14px;border-radius:7px;
+             border:1px solid rgba(123,47,190,.4);
+             background:rgba(123,47,190,.12);color:#a78bfa;
+             cursor:pointer;font-size:.72rem;font-family:'DM Mono',monospace">
+      ⬇ Add all ${movies.length} to Radarr
+    </button>
+  </div>`
+}
+
 function renderClassics(){
   const st = _sectionStatus("classics")
   const c  = document.getElementById("content")
@@ -565,9 +610,12 @@ function renderClassics(){
   if (st === "computing") { c.innerHTML = _renderSectionComputing("Building classics…"); return }
   let list   = applyFilters(DATA.classics||[])
   if (!list.length){ c.innerHTML=emptyStateHTML("No missing classics 🎉"); return }
+  _tabAllMovies = list
   const { slice, btn } = _paginate(list, "classics")
   c.innerHTML = `
-    <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">${list.length} classic films missing from your library</p>
+    <p style="color:var(--text3);font-size:.78rem;margin-bottom:.6rem">${list.length} classic films missing from your library</p>
+    ${_genrePills(list)}
+    ${_addAllBtn(list)}
     <div class="grid-posters">${slice.map(m=>posterCard(m)).join("")}</div>${btn}`
 }
 
@@ -582,13 +630,20 @@ function renderSuggestions(){
   const raw   = (DATA.suggestions||[]).filter(m => !owned.has(m.tmdb))
   const list  = applyFilters(raw)
   if (!list.length){ c.innerHTML=emptyStateHTML("No suggestions available"); return }
+  _tabAllMovies = list
   const { slice, btn } = _paginate(list, "suggestions")
   c.innerHTML = `
-    <p style="color:var(--text3);font-size:.78rem;margin-bottom:1rem">${list.length} films recommended by your library</p>
-    <div class="grid-posters">${slice.map(m => posterCard(m, m.rec_score
-      ? `<span style="color:var(--gold);font-size:.6rem">⚡${m.rec_score}</span>`
-      : ""
-    )).join("")}</div>${btn}`
+    <p style="color:var(--text3);font-size:.78rem;margin-bottom:.6rem">${list.length} films recommended by your library</p>
+    ${_genrePills(list)}
+    ${_addAllBtn(list)}
+    <div class="grid-posters">${slice.map(m => {
+      const srcTip = (m.sources||[]).length
+        ? `title="Because you own: ${escHtml((m.sources||[]).join(", "))}"` : ""
+      const badge = m.rec_score
+        ? `<span ${srcTip} style="color:var(--gold);font-size:.6rem;cursor:${srcTip?"help":"default"}">⚡${m.rec_score}</span>`
+        : ""
+      return posterCard(m, badge)
+    }).join("")}</div>${btn}`
 }
 
 /* ── Wishlist ────────────────────────────────────────────── */
@@ -611,16 +666,81 @@ async function renderWishlist(){
     } catch (_) {}
   }
 
+  _tabAllMovies = list
   const { slice, btn } = _paginate(list, "wishlist")
-  c.innerHTML = `<div class="grid-posters">${slice.map(m => {
-    const s = radarrStatuses[m.tmdb]
-    const badge = s === "available"
-      ? `<span style="background:var(--radarr,#7B2FBE);color:#fff;font-size:.58rem;padding:1px 5px;border-radius:3px;vertical-align:middle">✓ In Radarr</span>`
-      : s === "monitored"
-      ? `<span style="background:var(--gold);color:#000;font-size:.58rem;padding:1px 5px;border-radius:3px;vertical-align:middle">⬇ Searching</span>`
-      : ""
-    return posterCard(m, badge)
-  }).join("")}</div>${btn}`
+  c.innerHTML = `
+    ${_genrePills(list)}
+    <div class="grid-posters">${slice.map(m => {
+      const s = radarrStatuses[m.tmdb]
+      const badge = s === "available"
+        ? `<span style="background:var(--radarr,#7B2FBE);color:#fff;font-size:.58rem;padding:1px 5px;border-radius:3px;vertical-align:middle">✓ In Radarr</span>`
+        : s === "monitored"
+        ? `<span style="background:var(--gold);color:#000;font-size:.58rem;padding:1px 5px;border-radius:3px;vertical-align:middle">⬇ Searching</span>`
+        : ""
+      return posterCard(m, badge)
+    }).join("")}</div>${btn}`
+}
+
+/* ── In Theaters tab ─────────────────────────────────────── */
+
+let _theaterCache    = null
+let _theaterFetching = false
+
+async function renderTheaters() {
+  const c = document.getElementById("content")
+
+  // Show skeleton on first load
+  if (!_theaterCache && !_theaterFetching) {
+    _theaterFetching = true
+    c.innerHTML = _renderSectionComputing("Fetching from TMDB…")
+    try {
+      const res = await api("/api/theaters")
+      if (!res.ok) {
+        c.innerHTML = emptyStateHTML(res.error || "Failed to load theater data")
+        _theaterFetching = false
+        return
+      }
+      _theaterCache = res
+    } catch(e) {
+      c.innerHTML = emptyStateHTML("Failed to load theater data")
+      _theaterFetching = false
+      return
+    }
+    _theaterFetching = false
+  }
+
+  if (!_theaterCache) { c.innerHTML = _renderSectionComputing("Loading…"); return }
+
+  const all  = _theaterCache.movies || []
+  const list = applyFilters(all)
+
+  if (!all.length) {
+    c.innerHTML = emptyStateHTML("No upcoming films found — check your TMDB API key")
+    return
+  }
+  if (!list.length) {
+    c.innerHTML = emptyStateHTML("No films match the current filters")
+    return
+  }
+
+  _tabAllMovies = list
+  const { slice, btn } = _paginate(list, "theaters")
+  c.innerHTML = `
+    <p style="color:var(--text3);font-size:.78rem;margin-bottom:.6rem">
+      ${list.length} films now playing or coming soon · not in your library
+      <button onclick="_theaterCache=null;renderTheaters()"
+        style="margin-left:.75rem;background:none;border:none;color:var(--text3);
+               cursor:pointer;font-size:.78rem;vertical-align:middle" title="Refresh">↻</button>
+    </p>
+    ${_genrePills(list)}
+    ${_addAllBtn(list)}
+    <div class="grid-posters">${slice.map(m => {
+      const rel = m.release_date
+        ? `<span style="background:var(--bg3);color:var(--text3);font-size:.56rem;
+                        padding:1px 5px;border-radius:3px">📅 ${m.release_date}</span>`
+        : ""
+      return posterCard(m, rel)
+    }).join("")}</div>${btn}`
 }
 
 /* ── Letterboxd tab ──────────────────────────────────────── */
@@ -746,12 +866,16 @@ async function renderLetterboxd() {
   }
 
   const maxScore = movies[0]?.score || 1
-  const { slice, btn } = _paginate(movies, "letterboxd")
+  const filtered = applyFilters(movies)
+  _tabAllMovies  = filtered
+  const { slice, btn } = _paginate(filtered, "letterboxd")
   c.innerHTML = urlManager +
     (maxScore > 1
-      ? `<p style="color:var(--text3);font-size:.75rem;margin-bottom:1rem">
+      ? `<p style="color:var(--text3);font-size:.75rem;margin-bottom:.6rem">
            Gold badge = appears in multiple lists · sorted by frequency then rating</p>`
       : "") +
+    _genrePills(filtered) +
+    _addAllBtn(filtered) +
     `<div class="grid-posters">${slice.map(m => lbPosterCard(m)).join("")}</div>${btn}`
 }
 
