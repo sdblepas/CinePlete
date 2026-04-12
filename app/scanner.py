@@ -308,7 +308,8 @@ def _build_suggestions(plex_ids, tmdb, overrides, ignore_movies, wishlist_movies
     rec_fetched_ids = set(overrides.get("rec_fetched_ids", []))
 
     # Load persisted score map — only newly added movies will add to it
-    rec_scores: dict = dict(overrides.get("rec_scores", {}))
+    rec_scores:  dict = dict(overrides.get("rec_scores",  {}))
+    rec_sources: dict = dict(overrides.get("rec_sources", {}))  # tmdb_id → [source_ids…]
 
     ids_to_fetch = [mid for mid in plex_ids if mid not in rec_fetched_ids]
 
@@ -322,10 +323,15 @@ def _build_suggestions(plex_ids, tmdb, overrides, ignore_movies, wishlist_movies
             if rid:
                 key = str(rid)
                 rec_scores[key] = rec_scores.get(key, 0) + 1
+                # Track which library films triggered this recommendation (cap at 5)
+                srcs = rec_sources.get(key, [])
+                if mid not in srcs and len(srcs) < 5:
+                    rec_sources[key] = srcs + [mid]
 
     # Persist updated scores and fetched IDs — no full rebuild needed next scan
     if ids_to_fetch:
         overrides["rec_scores"]      = rec_scores
+        overrides["rec_sources"]     = rec_sources
         overrides["rec_fetched_ids"] = list(rec_fetched_ids | set(ids_to_fetch))
         save_json(OVERRIDES_FILE, overrides)
         log.info(f"rec_scores updated: {len(rec_scores)} candidates, "
@@ -355,6 +361,10 @@ def _build_suggestions(plex_ids, tmdb, overrides, ignore_movies, wishlist_movies
         if not release or release > today:
             continue
 
+        # Resolve up to 3 source titles from library
+        src_ids = rec_sources.get(rid_str, [])
+        sources = [plex_ids[s] for s in src_ids[:3] if s in plex_ids]
+
         suggestions.append({
             "title":      md.get("title"),
             "tmdb":       rid,
@@ -367,6 +377,7 @@ def _build_suggestions(plex_ids, tmdb, overrides, ignore_movies, wishlist_movies
             "rating":     md.get("vote_average", 0),
             "wishlist":   rid in wishlist_movies,
             "rec_score":  score,
+            "sources":    sources,          # library films that triggered this
         })
 
         if len(suggestions) >= max_results:
