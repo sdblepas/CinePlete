@@ -311,6 +311,13 @@ def _build_suggestions(plex_ids, tmdb, overrides, ignore_movies, wishlist_movies
     rec_scores:  dict = dict(overrides.get("rec_scores",  {}))
     rec_sources: dict = dict(overrides.get("rec_sources", {}))  # tmdb_id → [source_ids…]
 
+    # One-time backfill: if rec_scores exists but rec_sources is empty, the sources
+    # feature was just added. Reset rec_fetched_ids so the next scan rebuilds
+    # rec_sources for all library films (TMDB recommendations are cached so it's fast).
+    if rec_scores and not rec_sources:
+        log.info("rec_sources missing — resetting rec_fetched_ids for one-time backfill")
+        rec_fetched_ids = set()
+
     ids_to_fetch = [mid for mid in plex_ids if mid not in rec_fetched_ids]
 
     log.info(f"Fetching recommendations for {len(ids_to_fetch)} new films "
