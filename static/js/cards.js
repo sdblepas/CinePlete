@@ -157,6 +157,85 @@ function lbPosterCard(m) {
   </div>`
 }
 
+/* ── Suggestion poster card ─────────────────────────────────── */
+
+function suggestionCard(m) {
+  const tmdb     = m.tmdb
+  const safeName = (m.title || "").replace(/'/g, "\\'").replace(/"/g, "&quot;")
+  const score    = m.rec_score || 0
+  const sources  = m.sources  || []
+
+  const scoreBadge = score
+    ? `<div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.72);
+                   border:1px solid rgba(255,197,61,.4);color:var(--gold);
+                   font-size:.62rem;font-weight:700;font-family:'Syne',sans-serif;
+                   border-radius:5px;padding:2px 7px;z-index:2;line-height:1.5;
+                   box-shadow:0 1px 4px rgba(0,0,0,.5)">⚡${score}</div>`
+    : ""
+
+  const radarrBtn   = CONFIG?.RADARR?.RADARR_ENABLED
+    ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`
+    : ""
+  const radarr4kBtn = CONFIG?.RADARR_4K?.RADARR_4K_ENABLED
+    ? `<button class="btn-sm btn-radarr" style="opacity:.75" onclick="event.stopPropagation();addToRadarr4k(${tmdb},'${safeName}',this)">+ 4K</button>`
+    : ""
+  const overseerrBtn  = CONFIG?.OVERSEERR?.OVERSEERR_ENABLED
+    ? (overseerrRequested?.has(tmdb)
+        ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
+        : `<button class="btn-sm btn-overseerr" onclick="event.stopPropagation();addToOverseerr(${tmdb},'${safeName}',this)">→ OS</button>`)
+    : ""
+  const jellyseerrBtn = CONFIG?.JELLYSEERR?.JELLYSEERR_ENABLED
+    ? (jellyseerrRequested?.has(tmdb)
+        ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
+        : `<button class="btn-sm btn-jellyseerr" onclick="event.stopPropagation();addToJellyseerr(${tmdb},'${safeName}',this)">→ JS</button>`)
+    : ""
+
+  const movieData = JSON.stringify({tmdb:m.tmdb,title:m.title,year:m.year,poster:m.poster,rating:m.rating,wishlist:m.wishlist}).replace(/"/g,'&quot;')
+  const wBtn = m.wishlist
+    ? `<button class="btn-sm btn-wishlisted" data-movie="${movieData}" onclick="event.stopPropagation();removeWishlist(${tmdb},this)">★</button>`
+    : `<button class="btn-sm btn-wishlist"   data-movie="${movieData}" onclick="event.stopPropagation();addWishlist(${tmdb},this)">☆</button>`
+  const ignoreBtn = `<button class="btn-sm btn-ignore" title="Don't want this"
+    onclick="event.stopPropagation();ignoreMovie(${tmdb},'${safeName}',${m.year||"null"},'${m.poster||""}',this)">🚫</button>`
+
+  const rating  = parseFloat(m.rating || 0).toFixed(1)
+  const imgHtml = m.poster
+    ? `<img class="pc-img" src="${m.poster}" loading="lazy" alt=""/>`
+    : `<div class="pc-no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 2v20M17 2v20M2 12h20"/></svg><span>No Image</span></div>`
+
+  const mSafe = JSON.stringify({ tmdb: m.tmdb, title: m.title, year: m.year, poster: m.poster, wishlist: m.wishlist })
+    .replace(/'/g, "\\'")
+
+  const sourcesLine = sources.length
+    ? `<div style="font-size:.62rem;color:var(--text3);margin-top:.35rem;line-height:1.4">
+         Because you own:<br>
+         <span style="color:var(--text2)">${sources.map(s => escHtml(s)).join(", ")}</span>
+       </div>`
+    : ""
+
+  return `
+  <div class="pc" style="position:relative" data-tmdb="${tmdb}"
+    onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
+    ${scoreBadge}
+    <input type="checkbox" class="pc-check"
+      data-movie="${mSafe.replace(/"/g,'&quot;')}"
+      onclick="event.stopPropagation();toggleSelect(${tmdb},${mSafe.replace(/"/g,'&quot;')},this,event)"
+      title="Select"/>
+    ${imgHtml}
+    <div class="pc-info">
+      <div class="pc-title" title="${escHtml(m.title||"")}">${escHtml(m.title||"Untitled")}</div>
+      <div class="pc-meta">
+        <span class="pc-rating">⭐ ${rating}</span>
+        ${m.year ? `<span>${m.year}</span>` : ""}
+      </div>
+    </div>
+    <div class="pc-overlay">
+      <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
+      ${sourcesLine}
+      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${ignoreBtn}</div>
+    </div>
+  </div>`
+}
+
 /* ── Empty state ────────────────────────────────────────────── */
 
 function emptyStateHTML(msg){
