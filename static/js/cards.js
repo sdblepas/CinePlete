@@ -206,14 +206,14 @@ function suggestionCard(m) {
     .replace(/'/g, "\\'")
 
   const sourcesLine = sources.length
-    ? `<div style="font-size:.62rem;color:var(--text3);margin-top:.35rem;line-height:1.4">
-         Because you own:<br>
-         <span style="color:var(--text2)">${sources.map(s => escHtml(s)).join(", ")}</span>
+    ? `<div style="font-size:.6rem;color:rgba(255,255,255,.55);
+                   white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+         ⚡ ${sources.map(s => escHtml(s)).join(" · ")}
        </div>`
     : ""
 
   return `
-  <div class="pc" style="position:relative" data-tmdb="${tmdb}"
+  <div class="pc" data-tmdb="${tmdb}"
     onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
     ${scoreBadge}
     <input type="checkbox" class="pc-check"
