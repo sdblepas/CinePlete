@@ -205,15 +205,9 @@ function suggestionCard(m) {
   const mSafe = JSON.stringify({ tmdb: m.tmdb, title: m.title, year: m.year, poster: m.poster, wishlist: m.wishlist })
     .replace(/'/g, "\\'")
 
-  const sourcesLine = sources.length
-    ? `<div style="font-size:.6rem;color:rgba(255,255,255,.55);
-                   white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-         from: ${sources.map(s => escHtml(s)).join(" · ")}
-       </div>`
-    : ""
-
   return `
   <div class="pc" data-tmdb="${tmdb}"
+    ${sources.length ? `title="From: ${escHtml(sources.join(', '))}"` : ''}
     onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
     ${scoreBadge}
     <input type="checkbox" class="pc-check"
@@ -230,7 +224,6 @@ function suggestionCard(m) {
     </div>
     <div class="pc-overlay">
       <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
-      ${sourcesLine}
       <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${ignoreBtn}</div>
     </div>
   </div>`
