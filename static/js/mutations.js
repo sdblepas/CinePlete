@@ -539,8 +539,8 @@ async function addLbUrl(input) {
       toast("List added — fetching in background…", "gold")
       // Re-render immediately (shows new URL in list, cached movies stay)
       await renderLetterboxd()
-      // Server already started a refresh; poll for when it finishes
-      _startLbPoll()
+      // Explicitly trigger a refresh — adding a URL never auto-starts one
+      await triggerLbRefresh()
     } else {
       toast(res.error || "Failed to add URL", "error")
       if (btn) { btn.disabled = false; btn.textContent = "+ Add" }
@@ -556,7 +556,7 @@ async function removeLbUrl(url, btn) {
   try {
     await api("/api/letterboxd/urls/remove", "POST", { url })
     btn.disabled = false
-    toast("List removed — refreshing in background…", "gold")
+    toast("List removed", "gold")
     // Re-render immediately (URL gone from list, movies still cached)
     await renderLetterboxd()
     _startLbPoll()
