@@ -94,13 +94,13 @@ function _initGroupFilter(groups){
     drop.innerHTML = matched.map(g => {
       const n = g.name||""
       const active = n === inp.dataset.selected
-      return `<div class="gf-opt" data-name="${n.replace(/"/g,"&quot;")}"
+      return `<div class="gf-opt" data-name="${escHtml(n)}"
         style="padding:.5rem .85rem;font-size:.78rem;cursor:pointer;
                color:${active?"var(--gold)":"var(--text2)"};
                background:${active?"var(--gold-glow)":"transparent"}"
         onmouseover="this.style.background='var(--bg3)'"
         onmouseout="this.style.background='${active?"var(--gold-glow)":"transparent"}'"
-        >${n}</div>`
+        >${escHtml(n)}</div>`
     }).join("")
     drop.style.display = "block"
 
@@ -213,7 +213,7 @@ function updateFilterBar(){
     const yearOpts   = [["","All years"],["2020s","2020s"],["2010s","2010s"],["2000s","2000s"],["1990s","1990s"],["older","Older"]]
 
     bar.innerHTML = `
-      <input id="search" placeholder="Search…" value="${prevSearch}"/>
+      <input id="search" placeholder="Search…" value="${escHtml(prevSearch)}"/>
       <select id="yearFilter">
         ${yearOpts.map(([v,l])=>`<option value="${v}"${prevYear===v?" selected":""}>${l}</option>`).join("")}
       </select>

@@ -15,7 +15,8 @@ function toast(msg, type = "info"){
   el.className = `toast ${type}`
   el.innerHTML = `
     <div class="toast-dot" style="background:${colors[type]||colors.info}"></div>
-    <span>${msg}</span>`
+    <span></span>`
+  el.querySelector("span").textContent = msg
   document.getElementById("toastContainer").appendChild(el)
   setTimeout(() => {
     el.classList.add("fade-out")

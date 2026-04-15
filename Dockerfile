@@ -27,4 +27,8 @@ RUN useradd -m -u 1000 cineplete && \
 
 EXPOSE 8787
 
+# NOTE: We intentionally do not set USER here. The entrypoint uses gosu to
+# drop from root to the cineplete user (UID/GID remapped to match host PUID/PGID).
+# Setting USER would prevent the groupmod/usermod/chown calls the entrypoint needs.
+# The app itself always runs as non-root — see entrypoint.sh.
 ENTRYPOINT ["/entrypoint.sh"]
