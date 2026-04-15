@@ -253,10 +253,12 @@ async function testLibEntry(idx) {
   // Warn early when localhost / 127.0.0.1 is used — inside Docker these
   // point to the CinePlete container itself, not the host machine.
   if (/localhost|127\.0\.0\.1/.test(url || "")) {
+    let port = 8096
+    try { port = new URL(url).port || 8096 } catch {}
     resEl.innerHTML = `\u2717 <span style="color:var(--red,#ef4444)">
       <b>localhost won't work inside Docker.</b><br>
-      Use your server's LAN IP (e.g. <code>http://192.168.1.x:${new URL(url).port||8096}</code>)
-      or <code>http://host.docker.internal:${new URL(url).port||8096}</code> on Docker Desktop.
+      Use your server\u2019s LAN IP (e.g. <code>http://192.168.1.x:${port}</code>)
+      or <code>http://host.docker.internal:${port}</code> on Docker Desktop.
     </span>`
     resEl.style.color = "var(--red,#ef4444)"
     return
