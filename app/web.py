@@ -17,7 +17,7 @@ from app.config import load_config
 from app.auth import COOKIE_NAME, get_client_ip, is_local_address, verify_token
 from app import scheduler
 
-from app.routers import auth, config, scan, overrides, letterboxd, integrations, cache, theaters
+from app.routers import auth, config, scan, overrides, letterboxd, integrations, cache, theaters, streaming, quality
 
 _BASE_DIR  = Path(__file__).resolve().parent.parent
 STATIC_DIR = os.getenv("STATIC_DIR", str(_BASE_DIR / "static"))
@@ -91,3 +91,5 @@ app.include_router(letterboxd.router)
 app.include_router(integrations.router)
 app.include_router(cache.router)
 app.include_router(theaters.router)
+app.include_router(streaming.router)
+app.include_router(quality.router)

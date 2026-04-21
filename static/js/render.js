@@ -872,6 +872,70 @@ async function renderLetterboxd() {
     `<div class="grid-posters">${slice.map(m => lbPosterCard(m)).join("")}</div>${btn}`
 }
 
+/* ── Quality Upgrades tab ────────────────────────────────── */
+
+let _upgradeCache     = null
+let _upgradeFetching  = false
+
+async function renderQualityUpgrades() {
+  const c = document.getElementById("content")
+
+  if (!_upgradeCache && !_upgradeFetching) {
+    _upgradeFetching = true
+    c.innerHTML = _renderSectionComputing("Checking Radarr library…")
+    try {
+      const res = await api("/api/quality/upgrades")
+      if (!res.ok) {
+        c.innerHTML = emptyStateHTML(res.error || "Failed to load quality data")
+        _upgradeFetching = false
+        return
+      }
+      _upgradeCache = res
+    } catch(e) {
+      c.innerHTML = emptyStateHTML("Failed to load quality data")
+      _upgradeFetching = false
+      return
+    }
+    _upgradeFetching = false
+  }
+
+  if (!_upgradeCache) return
+
+  const movies = _upgradeCache.movies || []
+  if (!movies.length) {
+    c.innerHTML = `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
+        <button onclick="_upgradeCache=null;renderQualityUpgrades()"
+          style="background:none;border:1px solid var(--border2);color:var(--text3);
+                 border-radius:6px;padding:.3rem .75rem;font-size:.75rem;cursor:pointer">⟳ Refresh</button>
+      </div>` +
+      emptyStateHTML("All your movies are already in Radarr 4K, or none qualify for upgrade")
+    return
+  }
+
+  const list = applyFilters(movies)
+  _tabAllMovies = list
+  const { slice, btn } = _paginate(list, "upgrades")
+
+  const header = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+      <p style="color:var(--text3);font-size:.75rem;margin:0">
+        ${movies.length} movie${movies.length!==1?"s":""} at 720p or lower in your Radarr library — not yet in Radarr 4K
+      </p>
+      <button onclick="_upgradeCache=null;renderQualityUpgrades()"
+        style="background:none;border:1px solid var(--border2);color:var(--text3);
+               border-radius:6px;padding:.3rem .75rem;font-size:.75rem;cursor:pointer">⟳ Refresh</button>
+    </div>`
+
+  c.innerHTML = header +
+    _genrePills(list) +
+    `<div class="grid-posters">${slice.map(m => {
+      const qBadge = `<span style="background:var(--bg3);color:var(--text3);font-size:.56rem;
+                                   padding:1px 5px;border-radius:3px">📀 ${escHtml(m.current_quality||"")}</span>`
+      return upgradeCard(m, qBadge)
+    }).join("")}</div>${btn}`
+}
+
 function _startLbPoll() {
   if (_lbPollTimer) return   // already polling
   const started = Date.now()

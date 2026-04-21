@@ -200,6 +200,14 @@ class TMDB:
         )
         return self.get(url)
 
+    def watch_providers(self, tmdb_id: int) -> dict:
+        """Return JustWatch streaming availability data via TMDB watch/providers endpoint."""
+        url = (
+            f"https://api.themoviedb.org/3/movie/{tmdb_id}/watch/providers"
+            f"?api_key={self.api_key}"
+        )
+        return self.get(url)
+
     # ------------------------------------------------
     # PEOPLE
     # ------------------------------------------------

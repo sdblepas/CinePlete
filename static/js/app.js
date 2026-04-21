@@ -20,6 +20,7 @@ const PAGE_TITLES = {
   duplicates:  "Multi-Version",
   wishlist:    "Wishlist",
   theaters:    "In Theaters",
+  upgrades:    "Quality Upgrades",
   letterboxd:  "Lists",
   ignored:     "Ignored",
   config:      "Configuration",
@@ -37,7 +38,7 @@ const TAB_KEYS = {
 ============================================================ */
 
 function render(){
-  if (!DATA && !["config","logs","ignored","letterboxd","theaters"].includes(ACTIVE_TAB)){
+  if (!DATA && !["config","logs","ignored","letterboxd","theaters","upgrades"].includes(ACTIVE_TAB)){
     renderSkeleton()
     return
   }
@@ -66,6 +67,7 @@ function render(){
   if (ACTIVE_TAB==="duplicates")  return renderDuplicates()
   if (ACTIVE_TAB==="wishlist")    return renderWishlist()
   if (ACTIVE_TAB==="theaters")    return renderTheaters()
+  if (ACTIVE_TAB==="upgrades")    return renderQualityUpgrades()
   if (ACTIVE_TAB==="letterboxd")  return renderLetterboxd()
   if (ACTIVE_TAB==="ignored")     return renderIgnored()
   if (ACTIVE_TAB==="config")      return renderConfig()

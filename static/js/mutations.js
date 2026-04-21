@@ -442,6 +442,51 @@ async function addToRadarr4k(tmdb, title, btn) {
   }
 }
 
+/* ── Quality upgrade → Radarr 4K ───────────────────────────── */
+
+async function upgradeToRadarr4k(tmdb, title, btn) {
+  const orig = btn.textContent
+  btn.disabled = true; btn.textContent = "…"
+  const data = await _getRadarrPickerData("4k")
+  if (!data || (!data.profiles && !data.folders)) {
+    toast("Radarr 4K not reachable", "error")
+    btn.disabled = false; btn.textContent = orig
+    return
+  }
+  if (data.profiles.length > 1 || data.folders.length > 1) {
+    btn.disabled = false; btn.textContent = orig
+    _showRadarrPicker(tmdb, title, btn, "4k", async (result) => {
+      if (!result) return
+      const res = await api("/api/radarr/add?instance=4k", "POST", {
+        tmdb, title,
+        qualityProfileId: result.qualityProfileId,
+        rootFolderPath:   result.rootFolderPath,
+      })
+      if (res.ok) {
+        toast(`${title} → Radarr 4K`, "success")
+        btn.textContent = "✓ Queued"
+        btn.disabled = true
+        // Bust upgrade cache so refresh shows updated state
+        api("/api/quality/refresh", "POST")
+      } else {
+        toast(res.error || "Radarr 4K error", "error")
+        btn.disabled = false; btn.textContent = orig
+      }
+    })
+  } else {
+    const res = await api("/api/radarr/add?instance=4k", "POST", { tmdb, title })
+    if (res.ok) {
+      toast(`${title} → Radarr 4K`, "success")
+      btn.textContent = "✓ Queued"
+      btn.disabled = true
+      api("/api/quality/refresh", "POST")
+    } else {
+      toast(res.error || "Radarr 4K error", "error")
+      btn.disabled = false; btn.textContent = orig
+    }
+  }
+}
+
 /* ── Seerr requested state (localStorage) ──────────────────── */
 
 function _makeSeerrStore(key) {

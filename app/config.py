@@ -108,6 +108,10 @@ DEFAULT_CONFIG = {
     "FLARESOLVERR": {
         "FLARESOLVERR_URL": "",   # e.g. http://flaresolverr:8191
     },
+    "STREAMING": {
+        # ISO 3166-1 alpha-2 country code used to look up JustWatch availability
+        "STREAMING_COUNTRY": "US",
+    },
     "AUTH": {
         # "None" | "Forms" | "DisabledForLocalAddresses"
         "AUTH_METHOD": "None",
