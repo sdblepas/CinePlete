@@ -1,5 +1,5 @@
 """
-GET /api/quality/upgrades — Movies in primary Radarr with files below 4K
+GET /api/quality/upgrades — Movies in primary Radarr with files at 720p or lower
 that have not yet been added to Radarr 4K.  Cached for 15 minutes.
 
 POST /api/quality/refresh — Bust the upgrade cache (called after a 4K add).
@@ -72,7 +72,7 @@ def _poster_url(movie: dict) -> str | None:
 
 @router.get("/api/quality/upgrades")
 def get_quality_upgrades():
-    """Return movies in Radarr (HD or lower) not yet added to Radarr 4K."""
+    """Return movies in Radarr at 720p or lower, not yet added to Radarr 4K."""
     now = time.time()
     if _cache["data"] and now - _cache["ts"] < _CACHE_TTL:
         return _cache["data"]
@@ -114,7 +114,7 @@ def get_quality_upgrades():
     for m in primary_movies:
         tmdb_id    = int(m.get("tmdbId") or 0)
         resolution = _resolution(m)
-        if not tmdb_id or resolution == 0 or resolution >= 2160:
+        if not tmdb_id or resolution == 0 or resolution > 720:
             continue
         if tmdb_id in already_4k:
             continue

@@ -920,7 +920,7 @@ async function renderQualityUpgrades() {
   const header = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
       <p style="color:var(--text3);font-size:.75rem;margin:0">
-        ${movies.length} movie${movies.length!==1?"s":""} in your Radarr library below 4K — not yet in Radarr 4K
+        ${movies.length} movie${movies.length!==1?"s":""} at 720p or lower in your Radarr library — not yet in Radarr 4K
       </p>
       <button onclick="_upgradeCache=null;renderQualityUpgrades()"
         style="background:none;border:1px solid var(--border2);color:var(--text3);

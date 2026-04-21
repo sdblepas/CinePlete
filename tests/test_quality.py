@@ -45,7 +45,7 @@ from app.routers.quality import (
 # ---------------------------------------------------------------------------
 
 def _movie(tmdb_id=603, title="The Matrix", year=1999,
-           resolution=1080, quality_name="Bluray-1080p", has_file=True):
+           resolution=720, quality_name="WEBDL-720p", has_file=True):
     """Build a minimal Radarr movie dict."""
     base = {
         "tmdbId": tmdb_id,
@@ -107,7 +107,7 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(_resolution({"hasFile": True, "movieFile": {}}), 0)
 
     def test_quality_name(self):
-        self.assertEqual(_quality_name(_movie()), "Bluray-1080p")
+        self.assertEqual(_quality_name(_movie()), "WEBDL-720p")
 
     def test_quality_name_no_file(self):
         self.assertEqual(_quality_name({"hasFile": False}), "Unknown")
@@ -159,20 +159,23 @@ class TestGetQualityUpgrades(unittest.TestCase):
         self.assertNotIn(1, ids)   # no file → excluded
         self.assertIn(2, ids)
 
-    def test_filters_out_4k_movies(self):
+    def test_filters_out_above_720p_movies(self):
+        """Only 720p-or-lower movies are upgrade candidates; 1080p and 4K are excluded."""
         movies = [
-            _movie(tmdb_id=1, resolution=1080),
-            _movie(tmdb_id=2, resolution=2160, quality_name="Bluray-2160p"),
+            _movie(tmdb_id=1, resolution=720),
+            _movie(tmdb_id=2, resolution=1080, quality_name="Bluray-1080p"),
+            _movie(tmdb_id=3, resolution=2160, quality_name="Bluray-2160p"),
         ]
         _mock_get.return_value = _make_response(movies)
         with patch("app.routers.quality.load_config", return_value=BASE_CFG):
             result = get_quality_upgrades()
         ids = {m["tmdb"] for m in result["movies"]}
-        self.assertIn(1, ids)
-        self.assertNotIn(2, ids)   # already 4K → excluded
+        self.assertIn(1, ids)       # 720p → included
+        self.assertNotIn(2, ids)    # 1080p → excluded
+        self.assertNotIn(3, ids)    # 4K → excluded
 
     def test_excludes_movies_already_in_radarr_4k(self):
-        primary = [_movie(tmdb_id=603, resolution=1080), _movie(tmdb_id=680, resolution=1080)]
+        primary = [_movie(tmdb_id=603, resolution=720), _movie(tmdb_id=680, resolution=720)]
         # 603 is already in Radarr 4K
         radarr4k = [{"tmdbId": 603, "hasFile": False, "images": [], "ratings": {}}]
 
