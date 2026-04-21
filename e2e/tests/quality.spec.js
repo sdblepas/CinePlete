@@ -65,6 +65,7 @@ const REFRESH_OK       = { ok: true }
 // ---------------------------------------------------------------------------
 
 async function setupBase(page, upgradesPayload = UPGRADES_RESPONSE, configPayload = CONFIG_STUB_4K) {
+  await page.route('**/api/config/status',     r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, issues: [] }) }))
   await page.route('**/api/results',           r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RESULTS_STUB) }))
   await page.route('**/api/config',            r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(configPayload) }))
   await page.route('**/api/quality/upgrades',  r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(upgradesPayload) }))
@@ -230,6 +231,7 @@ test.describe('Quality Upgrades tab — refresh', () => {
 
   test('clicking refresh re-fetches upgrade data', async ({ page }) => {
     let callCount = 0
+    await page.route('**/api/config/status', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, issues: [] }) }))
     await page.route('**/api/results', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RESULTS_STUB) }))
     await page.route('**/api/config',  r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CONFIG_STUB_4K) }))
     await page.route('**/api/quality/upgrades', r => {

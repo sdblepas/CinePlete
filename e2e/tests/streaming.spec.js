@@ -96,6 +96,7 @@ const CONFIG_STUB = {
 // ---------------------------------------------------------------------------
 
 async function setupMocks(page, streamingPayload = STREAMING_WITH_PROVIDERS) {
+  await page.route('**/api/config/status',     r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, issues: [] }) }))
   await page.route('**/api/results',           r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RESULTS_STUB) }))
   await page.route('**/api/config',            r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CONFIG_STUB) }))
   await page.route(`**/api/movie/${TMDB_ID}`,  r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SAMPLE_MOVIE_DETAIL) }))
@@ -168,6 +169,7 @@ test.describe('Streaming availability in movie modal', () => {
   })
 
   test('modal still opens correctly when streaming API fails', async ({ page }) => {
+    await page.route('**/api/config/status',     r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, issues: [] }) }))
     await page.route('**/api/results',           r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RESULTS_STUB) }))
     await page.route('**/api/config',            r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CONFIG_STUB) }))
     await page.route(`**/api/movie/${TMDB_ID}`,  r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SAMPLE_MOVIE_DETAIL) }))
