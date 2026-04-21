@@ -305,6 +305,7 @@ function renderConfig(){
   const c     = document.getElementById("content")
   const cfg   = CONFIG||{}
   const tmdb  = cfg.TMDB        ||{}
+  const stm   = cfg.STREAMING   ||{}
   const radarr= cfg.RADARR      ||{}
   const r4k   = cfg.RADARR_4K   ||{}
   const cls   = cfg.CLASSICS    ||{}
@@ -408,6 +409,8 @@ function renderConfig(){
       <div class="form-section">
         ${sec("TMDB")}
         ${field("cfg_tmdb_key","TMDB API Key", tmdb.TMDB_API_KEY||"", "secret")}
+        ${field("cfg_streaming_country","Streaming Country", stm.STREAMING_COUNTRY||"US")}
+        ${hint("2-letter ISO country code for JustWatch streaming availability (e.g. US, GB, FR, DE, CA, AU).")}
       </div>
 
       <details class="form-section">
@@ -649,6 +652,9 @@ async function saveConfig(){
     },
     FLARESOLVERR:{
       FLARESOLVERR_URL: v("cfg_flaresolverr_url"),
+    },
+    STREAMING:{
+      STREAMING_COUNTRY: v("cfg_streaming_country").toUpperCase()||"US",
     },
   }
 
