@@ -194,12 +194,12 @@ test.describe('Quality Upgrades tab — → 4K button', () => {
 
     const firstCard = page.locator('.grid-posters .pc').first()
     await firstCard.hover()
-    const btn = firstCard.locator('button', { hasText: '→ 4K' })
-    await btn.click()
+    await firstCard.locator('button', { hasText: '→ 4K' }).click()
 
-    // Button should become disabled with success text
-    await expect(btn).toBeDisabled({ timeout: 3000 })
-    await expect(btn).toHaveText('✓ Queued')
+    // After success the button text changes to ✓ Queued — re-query by new text
+    const successBtn = firstCard.locator('button', { hasText: '✓ Queued' })
+    await expect(successBtn).toBeVisible({ timeout: 3000 })
+    await expect(successBtn).toBeDisabled()
   })
 
   test('4K button shows "Enable Radarr 4K" text when Radarr 4K is disabled', async ({ page }) => {
