@@ -160,7 +160,50 @@ async function openMovieModal(tmdb, fallback = {}) {
       <iframe id="trailerFrame" src="" frameborder="0" allowfullscreen
         allow="autoplay; encrypted-media"
         style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:8px"></iframe>
-    </div>`
+    </div>
+    <div id="streamingSection"></div>`
+
+  // Lazy-load streaming providers without blocking the modal render
+  _loadStreamingProviders(tmdb)
+}
+
+async function _loadStreamingProviders(tmdb) {
+  const el = document.getElementById("streamingSection")
+  if (!el) return
+  try {
+    const res = await api(`/api/streaming/${tmdb}`)
+    if (!_modalOpen || document.getElementById("streamingSection") !== el) return
+    if (!res.ok || !res.providers?.length) return
+
+    const TYPE_LABEL = { flatrate: "Stream", free: "Free", rent: "Rent", buy: "Buy" }
+    const byType = {}
+    for (const p of res.providers) {
+      ;(byType[p.type] = byType[p.type] || []).push(p)
+    }
+
+    const sections = Object.entries(byType).map(([type, providers]) => {
+      const logos = providers.slice(0, 6).map(p =>
+        p.logo
+          ? `<img src="${p.logo}" title="${escHtml(p.name)}" alt="${escHtml(p.name)}"
+               style="width:32px;height:32px;border-radius:6px;object-fit:cover" loading="lazy"/>`
+          : `<span style="font-size:.72rem;color:var(--text2)">${escHtml(p.name)}</span>`
+      ).join("")
+      return `<span style="font-size:.72rem;color:var(--text3);margin-right:.4rem">${escHtml(TYPE_LABEL[type]||type)}:</span>${logos}`
+    }).join('<span style="margin:0 .5rem;color:var(--border2)">·</span>')
+
+    const link = res.link
+      ? ` <a href="${res.link}" target="_blank" rel="noopener"
+            style="font-size:.7rem;color:var(--text3);text-decoration:none;margin-left:.5rem">JustWatch ↗</a>`
+      : ""
+
+    el.innerHTML = `
+      <div style="margin-top:.75rem;padding:.6rem .75rem;background:var(--bg3);
+                  border:1px solid var(--border2);border-radius:8px;
+                  display:flex;align-items:center;flex-wrap:wrap;gap:.4rem">
+        <span style="font-size:.72rem;font-weight:600;color:var(--text2);margin-right:.2rem">📺 Where to watch:</span>
+        ${sections}${link}
+      </div>`
+  } catch {}
 }
 
 function toggleModalTrailer(key) {
