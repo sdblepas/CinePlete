@@ -8,6 +8,7 @@
 ![Plex](https://img.shields.io/badge/Plex-compatible-orange)
 ![Jellyfin](https://img.shields.io/badge/Jellyfin-compatible-7B2FBE)
 ![Emby](https://img.shields.io/badge/Emby-compatible-00A4DC)
+![Trakt](https://img.shields.io/badge/Trakt-integration-ED2224)
 ![Proxmox](https://img.shields.io/badge/Proxmox-LXC--ready-E57000?logo=proxmox&logoColor=white)
 
 > 🇬🇧 [English version](README.md)
@@ -305,6 +306,39 @@ Configurez-le depuis **Config → Watchtower** :
 - Renseignez l'**URL Watchtower** (ex. `http://10.0.0.1:8081`)
 - Renseignez le **token API** (correspond à `WATCHTOWER_HTTP_API_TOKEN` sur Watchtower)
 - Cliquez **Update Now** pour déclencher un pull & redémarrage immédiat
+
+---
+
+### Intégration Trakt.tv
+
+Connectez votre compte Trakt pour afficher votre historique de visionnage sur chaque carte film et masquer optionnellement les films déjà vus dans toutes les grilles.
+
+**Configuration :**
+1. Créez une application sur [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications) pour obtenir un **Client ID** et un **Client Secret**.
+2. Dans CinePlete, allez dans **Config → Trakt.tv**, saisissez vos identifiants et cliquez sur **Connect**.
+3. Un code apparaît — rendez-vous sur [trakt.tv/activate](https://trakt.tv/activate) et entrez-le.
+4. CinePlete interroge Trakt automatiquement et sauvegarde vos tokens une fois autorisé.
+
+**Fonctionnalités :**
+- 🔴 **Badge Vu** — un ruban rouge apparaît sur chaque carte film présent dans votre historique Trakt
+- 🚫 **Masquer les films vus** — activez *Hide watched movies from all grids* pour retirer les films vus des onglets Sagas, Réalisateurs, Acteurs, Classiques et Suggestions (la Wishlist affiche toujours tous les films)
+- ⟳ **Actualisation manuelle** — cliquez *Refresh history* pour forcer une mise à jour immédiate (cache serveur de 1 heure)
+- 🔌 **Déconnecter** — supprime les tokens de `config.yml` immédiatement ; reconnectez-vous à tout moment
+
+**Référence config :**
+
+```yaml
+TRAKT:
+  TRAKT_ENABLED: true
+  TRAKT_CLIENT_ID: "votre_client_id"
+  TRAKT_CLIENT_SECRET: "votre_client_secret"
+  TRAKT_ACCESS_TOKEN: ""      # rempli automatiquement après connexion
+  TRAKT_REFRESH_TOKEN: ""     # rempli automatiquement après connexion
+  TRAKT_USERNAME: ""          # rempli automatiquement après connexion
+  TRAKT_HIDE_WATCHED: false
+```
+
+> Trakt utilise le flux **Device Code OAuth** — aucun URI de redirection requis, fonctionne derrière NAT et reverse proxies. Les tokens sont rafraîchis automatiquement à l'expiration.
 
 ---
 

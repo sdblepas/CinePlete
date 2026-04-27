@@ -17,6 +17,7 @@
 ![Radarr](https://img.shields.io/badge/Radarr-integration-purple)
 ![Overseerr](https://img.shields.io/badge/Overseerr-integration-F59E0B)
 ![Jellyseerr](https://img.shields.io/badge/Jellyseerr-integration-29B4E8)
+![Trakt](https://img.shields.io/badge/Trakt-integration-ED2224)
 ![Watchtower](https://img.shields.io/badge/Watchtower-auto--update-2496ED)
 ![TMDB](https://img.shields.io/badge/TMDB-API-blue)
 ![Homelab](https://img.shields.io/badge/homelab-friendly-blue)
@@ -425,6 +426,39 @@ watchtower:
 ```
 
 > The `?scope=cineplete` parameter ensures only CinePlete is updated. Add `com.centurylinklabs.watchtower.scope=cineplete` to your CinePlete container labels (already included in the docker-compose example above).
+
+---
+
+### Trakt.tv Integration
+
+Connect your Trakt account to overlay your watched history on every movie card and optionally hide already-watched films from all grids.
+
+**Setup:**
+1. Create an application at [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications) to get a **Client ID** and **Client Secret**.
+2. In CinePlete, go to **Config → Trakt.tv**, enter your credentials, and click **Connect**.
+3. A device code appears — visit [trakt.tv/activate](https://trakt.tv/activate) and enter it.
+4. CinePlete polls Trakt automatically and saves your tokens once authorised.
+
+**Features:**
+- 🔴 **Watched badge** — a red ribbon appears on every card for films already in your Trakt history
+- 🚫 **Hide watched** — toggle *Hide watched movies from all grids* to remove watched films from Franchises, Directors, Actors, Classics and Suggestions (Wishlist always shows all films)
+- ⟳ **Manual refresh** — click *Refresh history* to force an immediate update (server cache is 1 hour)
+- 🔌 **Disconnect** — clears tokens from `config.yml` immediately; reconnect any time
+
+**Config reference:**
+
+```yaml
+TRAKT:
+  TRAKT_ENABLED: true
+  TRAKT_CLIENT_ID: "your_client_id"
+  TRAKT_CLIENT_SECRET: "your_client_secret"
+  TRAKT_ACCESS_TOKEN: ""      # filled automatically after connect
+  TRAKT_REFRESH_TOKEN: ""     # filled automatically after connect
+  TRAKT_USERNAME: ""          # filled automatically after connect
+  TRAKT_HIDE_WATCHED: false
+```
+
+> Trakt uses **Device Code OAuth** — no redirect URI required, works behind NAT and reverse proxies. Access tokens are refreshed automatically on expiry.
 
 ---
 
