@@ -292,6 +292,27 @@ class TestDisconnect:
 
 
 # ---------------------------------------------------------------------------
+# POST /api/trakt/watched/refresh
+# ---------------------------------------------------------------------------
+
+class TestWatchedRefresh:
+    def setup_method(self):
+        self.client = TestClient(_make_app())
+
+    def test_busts_cache_and_returns_ok(self):
+        from app.routers import trakt as trakt_mod
+        # Prime the cache with a recent timestamp
+        trakt_mod._watched_cache["data"] = {"ok": True, "tmdb_ids": [1, 2]}
+        trakt_mod._watched_cache["ts"]   = time.time()
+
+        res = self.client.post("/api/trakt/watched/refresh")
+
+        assert res.json()["ok"] is True
+        # Cache timestamp should now be 0 (expired)
+        assert trakt_mod._watched_cache["ts"] == 0.0
+
+
+# ---------------------------------------------------------------------------
 # GET /api/trakt/watched
 # ---------------------------------------------------------------------------
 

@@ -260,6 +260,13 @@ def trakt_watched():
     return result
 
 
+@router.post("/api/trakt/watched/refresh")
+def trakt_watched_refresh():
+    """Bust the watched cache so the next GET re-fetches from Trakt."""
+    _watched_cache["ts"] = 0.0
+    return {"ok": True}
+
+
 @router.get("/api/trakt/status")
 def trakt_status():
     """Return connection state for the config UI."""

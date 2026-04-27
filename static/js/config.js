@@ -553,8 +553,14 @@ function renderConfig(){
                <div style="font-size:.78rem;color:var(--green);margin-bottom:.75rem">
                  ✓ Connected as <strong>@${escHtml(trkt.TRAKT_USERNAME||"")}</strong>
                </div>
-               <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px"
-                 onclick="traktDisconnect()">Disconnect</button>
+               <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                 <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;
+                   border-color:rgba(237,34,36,.4);color:#ED2224"
+                   onclick="traktRefreshWatched(this)">⟳ Refresh history</button>
+                 <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px"
+                   onclick="traktDisconnect()">Disconnect</button>
+                 <span id="traktRefreshStatus" style="font-size:.7rem;color:var(--text3)"></span>
+               </div>
              </div>`
           : `<div id="traktConnectedBox" style="display:none"></div>
              <div id="traktConnectBox">
@@ -814,8 +820,14 @@ async function traktConnect() {
           <div style="font-size:.78rem;color:var(--green);margin-bottom:.75rem">
             ✓ Connected as <strong>@${escHtml(poll.username||"")}</strong>
           </div>
-          <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px"
-            onclick="traktDisconnect()">Disconnect</button>`
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;
+              border-color:rgba(237,34,36,.4);color:#ED2224"
+              onclick="traktRefreshWatched(this)">⟳ Refresh history</button>
+            <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px"
+              onclick="traktDisconnect()">Disconnect</button>
+            <span id="traktRefreshStatus" style="font-size:.7rem;color:var(--text3)"></span>
+          </div>`
       }
       if (ctBox) ctBox.style.display = "none"
       // Update global config
@@ -878,4 +890,25 @@ async function traktDisconnect() {
   // Clear watched set
   if (typeof _traktWatchedIds !== "undefined") _traktWatchedIds = null
   toast("Trakt disconnected")
+}
+
+async function traktRefreshWatched(btn) {
+  const statusEl = document.getElementById("traktRefreshStatus")
+  btn.disabled = true
+  if (statusEl) { statusEl.textContent = "Refreshing…"; statusEl.style.color = "var(--text3)" }
+
+  // Bust backend cache then re-fetch
+  await api("/api/trakt/watched/refresh", "POST")
+  await _fetchTraktWatched()
+
+  btn.disabled = false
+  if (statusEl) {
+    const n = _traktWatchedIds?.size ?? 0
+    statusEl.textContent = `✓ ${n} watched movies`
+    statusEl.style.color = "var(--green)"
+    setTimeout(() => { if (statusEl) statusEl.textContent = "" }, 4000)
+  }
+  toast(`Trakt: watched history refreshed`, "success")
+  // Update cards on the current tab
+  if (typeof render !== "undefined" && !["config","logs"].includes(ACTIVE_TAB)) render()
 }
