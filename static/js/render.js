@@ -643,7 +643,7 @@ function renderSuggestions(){
 
 async function renderWishlist(){
   const c    = document.getElementById("content")
-  const list = applyFilters(DATA.wishlist||[])
+  const list = applyFilters(DATA.wishlist||[], { skipWatchedFilter: true })
 
   if (!list.length){
     c.innerHTML = emptyStateHTML("Wishlist is empty")

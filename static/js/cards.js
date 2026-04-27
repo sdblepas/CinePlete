@@ -9,6 +9,11 @@ function posterCard(m, extraTag = "") {
   const tmdb     = m.tmdb
   const safeName = (m.title || "").replace(/'/g, "\\'").replace(/"/g, "&quot;")
 
+  const _watched     = _traktWatchedIds?.has(tmdb)
+  const watchedBadge = _watched
+    ? `<div class="watched-badge">👁 Watched</div>` : ""
+  const watchedDim   = _watched ? " pc-watched" : ""
+
   const _inRadarr = _radarrLibTmdbIds?.has(tmdb)
   const radarrBtn = CONFIG?.RADARR?.RADARR_ENABLED
     ? (_inRadarr
@@ -53,7 +58,8 @@ function posterCard(m, extraTag = "") {
     .replace(/'/g, "\\'")
 
   return `
-  <div class="pc" data-tmdb="${tmdb}" onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
+  <div class="pc${watchedDim}" data-tmdb="${tmdb}" onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
+    ${watchedBadge}
     <input type="checkbox" class="pc-check"
       data-movie="${mSafe.replace(/"/g,'&quot;')}"
       onclick="event.stopPropagation();toggleSelect(${tmdb},${mSafe.replace(/"/g,'&quot;')},this,event)"
@@ -173,6 +179,11 @@ function suggestionCard(m) {
   const score    = m.rec_score || 0
   const sources  = m.sources  || []
 
+  const _watched2     = _traktWatchedIds?.has(tmdb)
+  const watchedBadge2 = _watched2
+    ? `<div class="watched-badge">👁 Watched</div>` : ""
+  const watchedDim2   = _watched2 ? " pc-watched" : ""
+
   const scoreBadge = score
     ? `<div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.72);
                    border:1px solid rgba(255,197,61,.4);color:var(--gold);
@@ -222,9 +233,10 @@ function suggestionCard(m) {
     .replace(/'/g, "\\'")
 
   return `
-  <div class="pc" data-tmdb="${tmdb}"
+  <div class="pc${watchedDim2}" data-tmdb="${tmdb}"
     ${sources.length ? `title="From: ${escHtml(sources.join(', '))}"` : ''}
     onclick="openMovieModal(${tmdb},${mSafe.replace(/"/g,'&quot;')})">
+    ${watchedBadge2}
     ${scoreBadge}
     <input type="checkbox" class="pc-check"
       data-movie="${mSafe.replace(/"/g,'&quot;')}"

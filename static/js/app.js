@@ -369,6 +369,7 @@ async function boot(){
   if (CONFIGURED) {
     await loadResults()
     _fetchRadarrLibrary()   // background fetch — no await, updates cards on next render
+    _fetchTraktWatched()    // background fetch — no await, populates watched overlay
   } else { setStatus("Setup required"); render() }
 }
 

@@ -319,6 +319,7 @@ function renderConfig(){
   const wtch  = cfg.WATCHTOWER   ||{}
   const auth  = cfg.AUTH         ||{}
   const fsolv = cfg.FLARESOLVERR ||{}
+  const trkt  = cfg.TRAKT        ||{}
 
   const field = (id, label, value, type="text") => {
     const isSecret  = type === "secret"
@@ -544,6 +545,32 @@ function renderConfig(){
         ${hint("e.g. http://flaresolverr:8191 — used to bypass Cloudflare when fetching Letterboxd lists.")}
       </div>
 
+      <div class="form-section">
+        ${sec('Trakt <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>', svcBadge('TRAKT','#ED2224'))}
+        ${trkt.TRAKT_ACCESS_TOKEN
+          ? `<div id="traktConnectBox" style="display:none"></div>
+             <div id="traktConnectedBox">
+               <div style="font-size:.78rem;color:var(--green);margin-bottom:.75rem">
+                 ✓ Connected as <strong>@${escHtml(trkt.TRAKT_USERNAME||"")}</strong>
+               </div>
+               <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px"
+                 onclick="traktDisconnect()">Disconnect</button>
+             </div>`
+          : `<div id="traktConnectedBox" style="display:none"></div>
+             <div id="traktConnectBox">
+               ${field("cfg_trakt_id",     "Client ID",     trkt.TRAKT_CLIENT_ID    ||"")}
+               ${field("cfg_trakt_secret", "Client Secret", trkt.TRAKT_CLIENT_SECRET||"", "secret")}
+               <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;margin-top:.25rem;
+                 border-color:rgba(237,34,36,.4);color:#ED2224"
+                 onclick="traktConnect()">🔗 Connect via Trakt</button>
+             </div>`}
+        <div id="traktDeviceBox" style="display:none;margin-top:.75rem;padding:.75rem;
+          background:var(--bg3);border:1px solid var(--border2);border-radius:8px;
+          text-align:center"></div>
+        ${check("cfg_trakt_hide", "Hide watched movies from all grids", trkt.TRAKT_HIDE_WATCHED||false)}
+        ${hint("When enabled, movies you have marked as watched in Trakt are hidden from all recommendation grids (except Wishlist).")}
+      </div>
+
       <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
       <div id="cfgStatus" style="font-size:.75rem;color:var(--text3);margin-top:.6rem;text-align:center"></div>
     </div>
@@ -670,6 +697,11 @@ async function saveConfig(){
     STREAMING:{
       STREAMING_COUNTRY: v("cfg_streaming_country").toUpperCase()||"US",
     },
+    TRAKT:{
+      TRAKT_CLIENT_ID:     v("cfg_trakt_id"),
+      TRAKT_CLIENT_SECRET: v("cfg_trakt_secret"),
+      TRAKT_HIDE_WATCHED:  vc("cfg_trakt_hide"),
+    },
   }
 
   const res = await api("/api/config","POST",payload)
@@ -705,4 +737,137 @@ async function triggerWatchtowerUpdate() {
     if (el) { el.textContent = "✗ Request failed"; el.style.color = "var(--red)" }
     toast("Watchtower request failed", "error")
   }
+}
+
+// ---------------------------------------------------------------------------
+// Trakt device-code OAuth helpers
+// ---------------------------------------------------------------------------
+
+let _traktPollTimer = null
+
+async function traktConnect() {
+  const clientId     = document.getElementById("cfg_trakt_id")?.value?.trim()
+  const clientSecret = document.getElementById("cfg_trakt_secret")?.value?.trim()
+  if (!clientId || !clientSecret) {
+    toast("Enter Client ID and Client Secret first", "error"); return
+  }
+
+  const box = document.getElementById("traktDeviceBox")
+  if (box) { box.style.display = "block"; box.innerHTML = "Connecting…" }
+
+  const res = await api("/api/trakt/device/code", "POST", { client_id: clientId, client_secret: clientSecret })
+  if (!res.ok) {
+    if (box) box.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(res.error||"Failed")}</span>`
+    return
+  }
+
+  const { device_code, user_code, verification_url, expires_in, interval } = res
+  const expiresAt = Date.now() + expires_in * 1000
+
+  if (box) {
+    box.innerHTML = `
+      <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">
+        Go to <a href="${escHtml(verification_url)}" target="_blank" rel="noopener"
+          style="color:var(--gold)">${escHtml(verification_url)}</a> and enter:
+      </div>
+      <div style="font-size:1.8rem;font-weight:700;letter-spacing:.25em;color:var(--text);
+                  font-family:'DM Mono',monospace;margin:.5rem 0">${escHtml(user_code)}</div>
+      <div id="traktCountdown" style="font-size:.7rem;color:var(--text3)"></div>`
+  }
+
+  // Start polling
+  if (_traktPollTimer) clearInterval(_traktPollTimer)
+  _traktPollTimer = setInterval(async () => {
+    const remaining = Math.max(0, Math.round((expiresAt - Date.now()) / 1000))
+    const cd = document.getElementById("traktCountdown")
+    if (cd) cd.textContent = `Waiting for authorisation… (${remaining}s remaining)`
+
+    if (Date.now() > expiresAt) {
+      clearInterval(_traktPollTimer); _traktPollTimer = null
+      if (box) box.innerHTML = `<span style="color:var(--red)">✗ Code expired — try again</span>`
+      return
+    }
+
+    const poll = await api("/api/trakt/device/poll", "POST", {
+      client_id: clientId, client_secret: clientSecret, device_code,
+    })
+
+    if (poll.status === "pending") return // keep waiting
+
+    clearInterval(_traktPollTimer); _traktPollTimer = null
+
+    if (poll.status === "success") {
+      if (box) box.style.display = "none"
+      const cbBox = document.getElementById("traktConnectedBox")
+      const ctBox = document.getElementById("traktConnectBox")
+      if (cbBox) {
+        cbBox.style.display = "block"
+        cbBox.innerHTML = `
+          <div style="font-size:.78rem;color:var(--green);margin-bottom:.75rem">
+            ✓ Connected as <strong>@${escHtml(poll.username||"")}</strong>
+          </div>
+          <button class="btn-sm btn-ignore" style="font-size:.72rem;padding:5px 14px"
+            onclick="traktDisconnect()">Disconnect</button>`
+      }
+      if (ctBox) ctBox.style.display = "none"
+      // Update global config
+      if (CONFIG?.TRAKT) {
+        CONFIG.TRAKT.TRAKT_ACCESS_TOKEN = "set"
+        CONFIG.TRAKT.TRAKT_USERNAME     = poll.username || ""
+        CONFIG.TRAKT.TRAKT_ENABLED      = true
+      }
+      toast(`Trakt connected as @${poll.username||""}`, "success")
+      // Refresh watched list
+      _fetchTraktWatched?.()
+    } else if (poll.status === "denied") {
+      if (box) box.innerHTML = `<span style="color:var(--red)">✗ Access denied by user</span>`
+    } else if (poll.status === "expired") {
+      if (box) box.innerHTML = `<span style="color:var(--red)">✗ Code expired — try again</span>`
+    } else {
+      if (box) box.innerHTML = `<span style="color:var(--red)">✗ Error — try again</span>`
+    }
+  }, (interval || 5) * 1000)
+}
+
+async function traktDisconnect() {
+  if (!confirm("Disconnect Trakt? Your watch history overlay will be removed.")) return
+  const res = await api("/api/trakt/disconnect", "POST")
+  if (!res.ok) { toast("Disconnect failed", "error"); return }
+
+  const cbBox = document.getElementById("traktConnectedBox")
+  const ctBox = document.getElementById("traktConnectBox")
+  const box   = document.getElementById("traktDeviceBox")
+  if (cbBox) cbBox.style.display = "none"
+  if (box)   box.style.display   = "none"
+  if (ctBox) {
+    ctBox.style.display = "block"
+    ctBox.innerHTML = `
+      <div class="form-group">
+        <label class="form-label" for="cfg_trakt_id">Client ID</label>
+        <div style="position:relative">
+          <input class="form-input" id="cfg_trakt_id" type="text" value=""/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cfg_trakt_secret">Client Secret</label>
+        <div style="position:relative">
+          <input class="form-input" id="cfg_trakt_secret" type="password" value=""
+            style="padding-right:2.2rem"/>
+          <button type="button" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'"
+            style="position:absolute;right:.4rem;top:50%;transform:translateY(-50%);
+                   background:none;border:none;color:var(--text3);cursor:pointer;font-size:.78rem;padding:2px">&#x1F441;</button>
+        </div>
+      </div>
+      <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;margin-top:.25rem;
+        border-color:rgba(237,34,36,.4);color:#ED2224"
+        onclick="traktConnect()">🔗 Connect via Trakt</button>`
+  }
+  if (CONFIG?.TRAKT) {
+    CONFIG.TRAKT.TRAKT_ACCESS_TOKEN = ""
+    CONFIG.TRAKT.TRAKT_USERNAME     = ""
+    CONFIG.TRAKT.TRAKT_ENABLED      = false
+  }
+  // Clear watched set
+  if (typeof _traktWatchedIds !== "undefined") _traktWatchedIds = null
+  toast("Trakt disconnected")
 }

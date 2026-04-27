@@ -247,6 +247,21 @@ async function searchInRadarr(tmdb, title, btn) {
   }
 }
 
+/* ── Trakt watched state ────────────────────────────────────── */
+
+/** Set of TMDB IDs the user has watched — null while loading, empty Set when disabled. */
+let _traktWatchedIds = null
+
+async function _fetchTraktWatched() {
+  if (!CONFIG?.TRAKT?.TRAKT_ENABLED || !CONFIG?.TRAKT?.TRAKT_ACCESS_TOKEN) {
+    _traktWatchedIds = new Set(); return
+  }
+  try {
+    const res = await api("/api/trakt/watched")
+    _traktWatchedIds = res.ok ? new Set(res.tmdb_ids) : new Set()
+  } catch { _traktWatchedIds = new Set() }
+}
+
 /* ── In-memory DATA helpers ─────────────────────────────────── */
 
 /**
