@@ -276,19 +276,37 @@ class TestDisconnect:
     def setup_method(self):
         self.client = TestClient(_make_app())
 
-    def test_clears_tokens_and_returns_ok(self):
-        with patch("app.routers.trakt.load_config") as mock_load, \
-             patch("app.routers.trakt.save_config") as mock_save:
-            mock_load.return_value = _cfg()
+    def test_clears_tokens_and_returns_ok(self, tmp_path):
+        import yaml as _yaml
+        cfg_file = tmp_path / "config.yml"
+        _yaml.safe_dump({
+            "TRAKT": {
+                "TRAKT_ENABLED":       True,
+                "TRAKT_CLIENT_ID":     "cid",
+                "TRAKT_CLIENT_SECRET": "csec",
+                "TRAKT_ACCESS_TOKEN":  "tok_abc",
+                "TRAKT_REFRESH_TOKEN": "ref_abc",
+                "TRAKT_USERNAME":      "filmlover",
+                "TRAKT_HIDE_WATCHED":  False,
+            }
+        }, open(cfg_file, "w"))
+
+        with patch("app.routers.trakt.CONFIG_FILE", str(cfg_file)), \
+             patch("app.routers.trakt.ensure_config_dir"):
             res = self.client.post("/api/trakt/disconnect")
 
         assert res.json()["ok"] is True
-        saved = mock_save.call_args[0][0]
-        trakt = saved["TRAKT"]
+
+        # Verify the YAML file was actually patched
+        loaded = _yaml.safe_load(open(cfg_file))
+        trakt  = loaded["TRAKT"]
         assert trakt["TRAKT_ENABLED"]       is False
         assert trakt["TRAKT_ACCESS_TOKEN"]  == ""
         assert trakt["TRAKT_REFRESH_TOKEN"] == ""
         assert trakt["TRAKT_USERNAME"]      == ""
+        # Client ID/Secret and hide-watched should be preserved
+        assert trakt["TRAKT_CLIENT_ID"]     == "cid"
+        assert trakt["TRAKT_HIDE_WATCHED"]  is False
 
 
 # ---------------------------------------------------------------------------

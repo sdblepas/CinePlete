@@ -7,13 +7,15 @@ Trakt.tv integration — device-code OAuth + watched-movie history.
   GET  /api/trakt/watched       — return TMDB IDs of watched movies (cached 1 h)
   GET  /api/trakt/status        — connection state for the config UI
 """
+import os
 import time
 import logging
 
+import yaml
 import requests
 from fastapi import APIRouter, Body
 
-from app.config import load_config, save_config
+from app.config import load_config, save_config, CONFIG_FILE, ensure_config_dir
 
 router = APIRouter()
 log    = logging.getLogger("cineplete")
@@ -207,18 +209,37 @@ def trakt_device_poll(payload: dict = Body(...)):
 
 @router.post("/api/trakt/disconnect")
 def trakt_disconnect():
-    """Clear stored Trakt tokens from config."""
-    cfg   = load_config()
-    trakt = cfg.get("TRAKT", {})
+    """Clear stored Trakt tokens from config.
+
+    Patches the YAML file directly rather than going through save_config's
+    full-config merge, guaranteeing the tokens are wiped even if other
+    sections of the config are missing from memory.
+    """
+    ensure_config_dir()
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+        else:
+            raw = {}
+    except (OSError, yaml.YAMLError):
+        raw = {}
+
+    trakt = raw.get("TRAKT", {})
     trakt.update({
         "TRAKT_ENABLED":       False,
         "TRAKT_ACCESS_TOKEN":  "",
         "TRAKT_REFRESH_TOKEN": "",
         "TRAKT_USERNAME":      "",
     })
-    cfg["TRAKT"] = trakt
-    save_config(cfg)
-    _watched_cache["ts"] = 0.0
+    raw["TRAKT"] = trakt
+
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        yaml.safe_dump(raw, f, sort_keys=False, allow_unicode=True)
+
+    _watched_cache["data"] = None
+    _watched_cache["ts"]   = 0.0
+    log.info("Trakt: disconnected, tokens cleared")
     return {"ok": True}
 
 

@@ -883,9 +883,10 @@ async function traktDisconnect() {
         onclick="traktConnect()">🔗 Connect via Trakt</button>`
   }
   if (CONFIG?.TRAKT) {
-    CONFIG.TRAKT.TRAKT_ACCESS_TOKEN = ""
-    CONFIG.TRAKT.TRAKT_USERNAME     = ""
-    CONFIG.TRAKT.TRAKT_ENABLED      = false
+    CONFIG.TRAKT.TRAKT_ACCESS_TOKEN  = ""
+    CONFIG.TRAKT.TRAKT_REFRESH_TOKEN = ""
+    CONFIG.TRAKT.TRAKT_USERNAME      = ""
+    CONFIG.TRAKT.TRAKT_ENABLED       = false
   }
   // Clear watched set
   if (typeof _traktWatchedIds !== "undefined") _traktWatchedIds = null
