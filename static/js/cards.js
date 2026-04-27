@@ -9,8 +9,11 @@ function posterCard(m, extraTag = "") {
   const tmdb     = m.tmdb
   const safeName = (m.title || "").replace(/'/g, "\\'").replace(/"/g, "&quot;")
 
+  const _inRadarr = _radarrLibTmdbIds?.has(tmdb)
   const radarrBtn = CONFIG?.RADARR?.RADARR_ENABLED
-    ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`
+    ? (_inRadarr
+        ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();searchInRadarr(${tmdb},'${safeName}',this)">⟳ Search</button>`
+        : `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`)
     : ""
   const radarr4kBtn = CONFIG?.RADARR_4K?.RADARR_4K_ENABLED
     ? `<button class="btn-sm btn-radarr" style="opacity:.75" onclick="event.stopPropagation();addToRadarr4k(${tmdb},'${safeName}',this)">+ 4K</button>`
@@ -24,6 +27,11 @@ function posterCard(m, extraTag = "") {
     ? (jellyseerrRequested?.has(tmdb)
         ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
         : `<button class="btn-sm btn-jellyseerr" onclick="event.stopPropagation();addToJellyseerr(${tmdb},'${safeName}',this)">→ JS</button>`)
+    : ""
+  const seerrBtn = CONFIG?.SEERR?.SEERR_ENABLED
+    ? (seerrRequested?.has(tmdb)
+        ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
+        : `<button class="btn-sm btn-seerr" onclick="event.stopPropagation();addToSeerr(${tmdb},'${safeName}',this)">→ Seerr</button>`)
     : ""
 
   // Encode movie data on the button so add/remove toggles can update DATA without extra API calls
@@ -61,7 +69,7 @@ function posterCard(m, extraTag = "") {
     </div>
     <div class="pc-overlay">
       <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
-      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${ignoreBtn}</div>
+      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${seerrBtn}${ignoreBtn}</div>
     </div>
   </div>`
 }
@@ -173,8 +181,11 @@ function suggestionCard(m) {
                    box-shadow:0 1px 4px rgba(0,0,0,.5)">⚡${score}</div>`
     : ""
 
+  const _inRadarr2  = _radarrLibTmdbIds?.has(tmdb)
   const radarrBtn   = CONFIG?.RADARR?.RADARR_ENABLED
-    ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`
+    ? (_inRadarr2
+        ? `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();searchInRadarr(${tmdb},'${safeName}',this)">⟳ Search</button>`
+        : `<button class="btn-sm btn-radarr" onclick="event.stopPropagation();addToRadarr(${tmdb},'${safeName}',this)">+ Radarr</button>`)
     : ""
   const radarr4kBtn = CONFIG?.RADARR_4K?.RADARR_4K_ENABLED
     ? `<button class="btn-sm btn-radarr" style="opacity:.75" onclick="event.stopPropagation();addToRadarr4k(${tmdb},'${safeName}',this)">+ 4K</button>`
@@ -188,6 +199,11 @@ function suggestionCard(m) {
     ? (jellyseerrRequested?.has(tmdb)
         ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
         : `<button class="btn-sm btn-jellyseerr" onclick="event.stopPropagation();addToJellyseerr(${tmdb},'${safeName}',this)">→ JS</button>`)
+    : ""
+  const seerrBtn2 = CONFIG?.SEERR?.SEERR_ENABLED
+    ? (seerrRequested?.has(tmdb)
+        ? `<button class="btn-sm" style="color:var(--green)" disabled>✓ Requested</button>`
+        : `<button class="btn-sm btn-seerr" onclick="event.stopPropagation();addToSeerr(${tmdb},'${safeName}',this)">→ Seerr</button>`)
     : ""
 
   const movieData = JSON.stringify({tmdb:m.tmdb,title:m.title,year:m.year,poster:m.poster,rating:m.rating,wishlist:m.wishlist}).replace(/"/g,'&quot;')
@@ -224,7 +240,7 @@ function suggestionCard(m) {
     </div>
     <div class="pc-overlay">
       <div class="pc-overlay-title">${escHtml(m.title||"Untitled")}</div>
-      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${ignoreBtn}</div>
+      <div class="pc-overlay-actions">${wBtn}${radarrBtn}${radarr4kBtn}${overseerrBtn}${jellyseerrBtn}${seerrBtn2}${ignoreBtn}</div>
     </div>
   </div>`
 }

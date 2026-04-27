@@ -96,6 +96,11 @@ DEFAULT_CONFIG = {
         "JELLYSEERR_URL": "",
         "JELLYSEERR_API_KEY": "",
     },
+    "SEERR": {
+        "SEERR_ENABLED": False,
+        "SEERR_URL": "",
+        "SEERR_API_KEY": "",
+    },
     "WEBHOOK": {
         "WEBHOOK_ENABLED": False,
         "WEBHOOK_SECRET": "",

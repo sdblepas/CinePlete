@@ -902,7 +902,7 @@
     }
     #clipboardBtn:hover { background: var(--border); color: var(--gold); }
 
-    /* Overseerr / Jellyseerr / Trailer buttons */
+    /* Overseerr / Jellyseerr / Seerr / Trailer buttons */
     .btn-overseerr {
       background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.35);
       color: #60a5fa;
@@ -913,6 +913,11 @@
       color: #c084fc;
     }
     .btn-jellyseerr:hover { background: rgba(168,85,247,.22); }
+    .btn-seerr {
+      background: rgba(20,184,166,.12); border-color: rgba(20,184,166,.35);
+      color: #2dd4bf;
+    }
+    .btn-seerr:hover { background: rgba(20,184,166,.22); }
     .btn-trailer {
       background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.35);
       color: #f87171;
@@ -1300,6 +1305,7 @@
     <button class="btn-sm btn-radarr"     onclick="batchAddToRadarr()"          id="batchRadarr">+ Radarr</button>
     <button class="btn-sm btn-overseerr"  onclick="batchAddToOverseerr()"       id="batchOverseerr"  style="display:none">→ Overseerr</button>
     <button class="btn-sm btn-jellyseerr" onclick="batchAddToJellyseerr()"      id="batchJellyseerr" style="display:none">→ Jellyseerr</button>
+    <button class="btn-sm btn-seerr"      onclick="batchAddToSeerr()"           id="batchSeerr"      style="display:none">→ Seerr</button>
     <button class="btn-sm btn-wishlist"   onclick="batchWishlistAction()"       id="batchWishlist">☆ Wishlist</button>
     <button class="btn-sm btn-ignore"     onclick="batchIgnoreMovies()"         id="batchIgnore">🚫 Ignore all</button>
     <button class="btn-sm"                onclick="clearSelection()" style="background:var(--bg2);color:var(--text2)">✕ Clear</button>

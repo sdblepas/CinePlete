@@ -1,10 +1,14 @@
 """
-Radarr / Overseerr / Jellyseerr / Webhook / Watchtower routes.
+Radarr / Overseerr / Jellyseerr / Seerr / Webhook / Watchtower routes.
   GET  /api/radarr/profiles
+  GET  /api/radarr/rootfolders
+  GET  /api/radarr/library
   POST /api/radarr/add
+  POST /api/radarr/search
   GET  /api/radarr/status
   POST /api/overseerr/add
   POST /api/jellyseerr/add
+  POST /api/seerr/add
   POST /api/webhook
   POST /api/watchtower/update
 """
@@ -68,7 +72,14 @@ def _radarr_post(
     return {"ok": True}
 
 
-_radarr_status_cache: dict = {"data": None, "ts": 0.0}
+_radarr_status_cache:   dict = {"data": None, "ts": 0.0}
+_radarr_library_cache:  dict = {"data": None, "ts": 0.0}
+_RADARR_LIB_TTL = 300   # 5 minutes
+
+
+def _invalidate_radarr_library_cache():
+    """Call after a successful Radarr add so the library set refreshes promptly."""
+    _radarr_library_cache["ts"] = 0.0
 
 
 # --------------------------------------------------
@@ -176,7 +187,82 @@ def radarr_add(payload: dict = Body(...), instance: str = Query(default="primary
     section = cfg.get("RADARR", {})
     if not section.get("RADARR_ENABLED"):
         return {"ok": False, "error": "Radarr disabled"}
-    return _radarr_post(section, "RADARR", tmdb_id, title, quality_override, root_override)
+    result = _radarr_post(section, "RADARR", tmdb_id, title, quality_override, root_override)
+    if result.get("ok"):
+        _invalidate_radarr_library_cache()
+    return result
+
+
+@router.get("/api/radarr/library")
+def radarr_library():
+    """Return the set of TMDB IDs for all movies in Radarr (primary). Cached 5 min."""
+    now = time.time()
+    if _radarr_library_cache["data"] and now - _radarr_library_cache["ts"] < _RADARR_LIB_TTL:
+        return _radarr_library_cache["data"]
+
+    cfg    = load_config()
+    radarr = cfg.get("RADARR", {})
+    if not radarr.get("RADARR_ENABLED"):
+        return {"ok": True, "tmdb_ids": []}
+
+    url = str(radarr.get("RADARR_URL", "")).rstrip("/")
+    key = str(radarr.get("RADARR_API_KEY", "")).strip()
+    if not url or urlparse(url).scheme not in ("http", "https"):
+        return {"ok": True, "tmdb_ids": []}
+
+    try:
+        r = requests.get(f"{url}/api/v3/movie", headers={"X-Api-Key": key}, timeout=20)
+        if r.status_code == 200:
+            tmdb_ids = [int(m["tmdbId"]) for m in r.json() if m.get("tmdbId")]
+            result = {"ok": True, "tmdb_ids": tmdb_ids}
+        else:
+            result = {"ok": True, "tmdb_ids": []}
+    except requests.exceptions.RequestException as e:
+        log.warning(f"Radarr library fetch failed: {e}")
+        result = {"ok": True, "tmdb_ids": []}
+
+    _radarr_library_cache.update({"data": result, "ts": now})
+    return result
+
+
+@router.post("/api/radarr/search")
+def radarr_search(payload: dict = Body(...)):
+    """Trigger a MoviesSearch command in Radarr for an already-monitored movie."""
+    cfg    = load_config()
+    radarr = cfg.get("RADARR", {})
+    if not radarr.get("RADARR_ENABLED"):
+        return {"ok": False, "error": "Radarr not enabled"}
+
+    tmdb_id = _parse_tmdb_id(payload.get("tmdb"))
+    if tmdb_id is None:
+        return {"ok": False, "error": "Invalid TMDB ID"}
+
+    url = str(radarr.get("RADARR_URL", "")).rstrip("/")
+    key = str(radarr.get("RADARR_API_KEY", "")).strip()
+    headers = {"X-Api-Key": key}
+
+    try:
+        # Resolve Radarr's internal movie ID from TMDB ID
+        r = requests.get(
+            f"{url}/api/v3/movie", params={"tmdbId": tmdb_id},
+            headers=headers, timeout=10,
+        )
+        movies = r.json() if r.status_code == 200 else []
+        if not movies:
+            return {"ok": False, "error": "Movie not found in Radarr"}
+        radarr_id = movies[0]["id"]
+
+        # Kick off a search
+        r2 = requests.post(
+            f"{url}/api/v3/command",
+            json={"name": "MoviesSearch", "movieIds": [radarr_id]},
+            headers=headers, timeout=10,
+        )
+        if r2.status_code not in (200, 201):
+            return {"ok": False, "error": r2.text}
+        return {"ok": True}
+    except requests.exceptions.RequestException as e:
+        return {"ok": False, "error": str(e)}
 
 
 @router.get("/api/radarr/status")
@@ -278,6 +364,35 @@ def jellyseerr_add(payload: dict = Body(...)):
     try:
         r = requests.post(
             f"{cfg['JELLYSEERR_URL'].rstrip('/')}/api/v1/request",
+            json={"mediaType": "movie", "mediaId": tmdb_id},
+            headers=headers, timeout=20,
+        )
+    except requests.exceptions.RequestException as e:
+        return {"ok": False, "error": str(e)}
+    if r.status_code not in (200, 201):
+        return {"ok": False, "error": r.text}
+    return {"ok": True}
+
+
+# --------------------------------------------------
+# Seerr (unified Overseerr + Jellyseerr successor)
+# --------------------------------------------------
+
+@router.post("/api/seerr/add")
+def seerr_add(payload: dict = Body(...)):
+    cfg = load_config().get("SEERR", {})
+    if not cfg.get("SEERR_ENABLED"):
+        return {"ok": False, "error": "Seerr disabled"}
+    tmdb_id = _parse_tmdb_id(payload.get("tmdb"))
+    if tmdb_id is None:
+        return {"ok": False, "error": "Invalid TMDB ID"}
+    api_key = cfg.get("SEERR_API_KEY", "").strip()
+    if not api_key:
+        return {"ok": False, "error": "Seerr API key not configured"}
+    headers = {"X-Api-Key": api_key, "Content-Type": "application/json"}
+    try:
+        r = requests.post(
+            f"{cfg['SEERR_URL'].rstrip('/')}/api/v1/request",
             json={"mediaType": "movie", "mediaId": tmdb_id},
             headers=headers, timeout=20,
         )
