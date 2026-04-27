@@ -12,8 +12,9 @@ from fastapi import APIRouter, Query
 from fastapi.responses import PlainTextResponse
 
 from app.config import load_config, is_configured
+from app.overrides import load_json as _load_overrides
 from app.scanner import build_async, scan_state, _scan_lock
-from app.routers._shared import log, read_results, LOG_FILE
+from app.routers._shared import log, read_results, LOG_FILE, OVERRIDES_FILE
 
 router = APIRouter()
 
@@ -38,6 +39,28 @@ def api_results():
             "launched":   launched,
             "message":    "First scan started — poll /api/scan/status for progress",
         }
+
+    # Re-apply ignore_movies at serve time so movies ignored since the last
+    # scan don't reappear on browser refresh (the scanner already strips them
+    # at scan time, but results.json can become stale between scans).
+    try:
+        ov          = _load_overrides(OVERRIDES_FILE)
+        ignored_ids = set(ov.get("ignore_movies", []))
+        if ignored_ids:
+            for key in ("classics", "suggestions"):
+                if key in data:
+                    data[key] = [
+                        m for m in data[key]
+                        if m.get("tmdb") not in ignored_ids
+                    ]
+            for key in ("franchises", "directors", "actors"):
+                for group in data.get(key, []):
+                    group["missing"] = [
+                        m for m in group.get("missing", [])
+                        if m.get("tmdb") not in ignored_ids
+                    ]
+    except Exception:
+        pass   # never block the response if overrides are unreadable
 
     data["configured"] = True
     data["scanning"]   = scan_state["running"]
@@ -208,10 +231,19 @@ def api_search(q: str = Query(default="")):
     if not results:
         return {"results": []}
 
+    # Exclude ignored movies so they don't appear in search results
+    try:
+        ov          = _load_overrides(OVERRIDES_FILE)
+        ignored_ids = set(ov.get("ignore_movies", []))
+    except Exception:
+        ignored_ids = set()
+
     q_lower = q.lower()
     hits: list = []
 
     def _match(m: dict, tab: str, group: str = ""):
+        if m.get("tmdb") in ignored_ids:
+            return
         if q_lower in (m.get("title") or "").lower():
             hits.append({**m, "_tab": tab, "_group": group})
 
