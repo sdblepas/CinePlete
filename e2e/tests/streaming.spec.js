@@ -151,7 +151,8 @@ test.describe('Streaming availability in movie modal', () => {
     const section = page.locator('#streamingSection')
     await expect(section).not.toBeEmpty({ timeout: 5000 })
 
-    const link = section.locator('a[href*="justwatch.com"]')
+    // Provider logos are also wrapped in JustWatch links — target the text link specifically
+    const link = section.locator('a[href*="justwatch.com"]:has-text("JustWatch")')
     await expect(link).toBeVisible()
     await expect(link).toHaveAttribute('target', '_blank')
   })
