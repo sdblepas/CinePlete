@@ -307,6 +307,7 @@ function renderConfig(){
   const tmdb  = cfg.TMDB        ||{}
   const stm   = cfg.STREAMING   ||{}
   const radarr= cfg.RADARR      ||{}
+  const seerr = cfg.SEERR       ||{}
   const r4k   = cfg.RADARR_4K   ||{}
   const cls   = cfg.CLASSICS    ||{}
   const act   = cfg.ACTOR_HITS  ||{}
@@ -496,19 +497,27 @@ function renderConfig(){
       </div>
 
       <div class="form-section">
-        ${sec('Overseerr <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>', svcBadge('OVERSEERR','#F59E0B','#000'))}
-        ${check("cfg_ovs_enabled", "Enabled", ovs.OVERSEERR_ENABLED)}
-        ${field("cfg_ovs_url",   "Overseerr URL",  ovs.OVERSEERR_URL    ||"")}
-        ${field("cfg_ovs_key",   "API Key",         ovs.OVERSEERR_API_KEY||"", "secret")}
-        ${hint("Point to your Overseerr instance. API key found in Overseerr → Settings → General.")}
+        ${sec('Seerr <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>', svcBadge('SEERR','#14b8a6'))}
+        ${check("cfg_seerr_enabled", "Enabled", seerr.SEERR_ENABLED)}
+        ${field("cfg_seerr_url", "Seerr URL",  seerr.SEERR_URL    ||"")}
+        ${field("cfg_seerr_key", "API Key",    seerr.SEERR_API_KEY||"", "secret")}
+        ${hint("Unified successor to Overseerr &amp; Jellyseerr. API key found in Seerr → Settings → General.")}
       </div>
 
       <div class="form-section">
-        ${sec('Jellyseerr <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>', svcBadge('JELLYSEERR','#29B4E8'))}
+        ${sec('Overseerr <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(legacy)</span>', svcBadge('OVERSEERR','#F59E0B','#000'))}
+        ${check("cfg_ovs_enabled", "Enabled", ovs.OVERSEERR_ENABLED)}
+        ${field("cfg_ovs_url",   "Overseerr URL",  ovs.OVERSEERR_URL    ||"")}
+        ${field("cfg_ovs_key",   "API Key",         ovs.OVERSEERR_API_KEY||"", "secret")}
+        ${hint("⚠️ Legacy — no longer maintained upstream. Consider migrating to Seerr.")}
+      </div>
+
+      <div class="form-section">
+        ${sec('Jellyseerr <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(legacy)</span>', svcBadge('JELLYSEERR','#29B4E8'))}
         ${check("cfg_jss_enabled", "Enabled", jss.JELLYSEERR_ENABLED)}
         ${field("cfg_jss_url",   "Jellyseerr URL",  jss.JELLYSEERR_URL    ||"")}
         ${field("cfg_jss_key",   "API Key",          jss.JELLYSEERR_API_KEY||"", "secret")}
-        ${hint("Same API format as Overseerr. API key found in Jellyseerr → Settings → General.")}
+        ${hint("⚠️ Legacy — no longer maintained upstream. Consider migrating to Seerr.")}
       </div>
 
       <div class="form-section">
@@ -615,6 +624,11 @@ async function saveConfig(){
       RADARR_4K_ROOT_FOLDER_PATH:  v("cfg_r4k_root"),
       RADARR_4K_QUALITY_PROFILE_ID:vi("cfg_r4k_quality"),
       RADARR_4K_SEARCH_ON_ADD:     vc("cfg_r4k_search"),
+    },
+    SEERR:{
+      SEERR_ENABLED: vc("cfg_seerr_enabled"),
+      SEERR_URL:     v("cfg_seerr_url"),
+      SEERR_API_KEY: v("cfg_seerr_key"),
     },
     OVERSEERR:{
       OVERSEERR_ENABLED: vc("cfg_ovs_enabled"),

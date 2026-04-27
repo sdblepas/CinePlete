@@ -117,6 +117,9 @@ async function openMovieModal(tmdb, fallback = {}) {
   const jellyseerrBtn = CONFIG?.JELLYSEERR?.JELLYSEERR_ENABLED
     ? `<button class="btn-sm btn-jellyseerr" onclick="addToJellyseerr(${tmdb},'${safeTitle}',this)">→ Jellyseerr</button>`
     : ""
+  const seerrBtn = CONFIG?.SEERR?.SEERR_ENABLED
+    ? `<button class="btn-sm btn-seerr" onclick="addToSeerr(${tmdb},'${safeTitle}',this)">→ Seerr</button>`
+    : ""
   const trailerBtn = md.trailer_key
     ? `<button class="btn-sm btn-trailer" onclick="toggleModalTrailer('${md.trailer_key}')">▶ Trailer</button>`
     : ""
@@ -150,6 +153,7 @@ async function openMovieModal(tmdb, fallback = {}) {
       ${radarr4kBtn}
       ${overseerrBtn}
       ${jellyseerrBtn}
+      ${seerrBtn}
       ${trailerBtn}
       <a href="${md.tmdb_url || `https://www.themoviedb.org/movie/${tmdb}`}"
          target="_blank" rel="noopener"
@@ -181,11 +185,17 @@ async function _loadStreamingProviders(tmdb) {
       ;(byType[p.type] = byType[p.type] || []).push(p)
     }
 
+    const jwLink = res.link || ""
     const sections = Object.entries(byType).map(([type, providers]) => {
       const logos = providers.slice(0, 6).map(p =>
         p.logo
-          ? `<img src="${p.logo}" title="${escHtml(p.name)}" alt="${escHtml(p.name)}"
-               style="width:32px;height:32px;border-radius:6px;object-fit:cover" loading="lazy"/>`
+          ? `<a href="${jwLink||"https://www.justwatch.com"}" target="_blank" rel="noopener"
+               title="${escHtml(p.name)}" style="display:inline-block;line-height:0">
+               <img src="${p.logo}" alt="${escHtml(p.name)}"
+                 style="width:32px;height:32px;border-radius:6px;object-fit:cover;
+                        transition:opacity .15s" loading="lazy"
+                 onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'"/>
+             </a>`
           : `<span style="font-size:.72rem;color:var(--text2)">${escHtml(p.name)}</span>`
       ).join("")
       return `<span style="font-size:.72rem;color:var(--text3);margin-right:.4rem">${escHtml(TYPE_LABEL[type]||type)}:</span>${logos}`

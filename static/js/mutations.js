@@ -76,9 +76,11 @@ function updateBatchBar() {
     bar.classList.add("visible")
     const ovsBtn = document.getElementById("batchOverseerr")
     const jssBtn = document.getElementById("batchJellyseerr")
+    const srrBtn = document.getElementById("batchSeerr")
     const wlBtn  = document.getElementById("batchWishlist")
     if (ovsBtn) ovsBtn.style.display = CONFIG?.OVERSEERR?.OVERSEERR_ENABLED   ? "" : "none"
     if (jssBtn) jssBtn.style.display = CONFIG?.JELLYSEERR?.JELLYSEERR_ENABLED ? "" : "none"
+    if (srrBtn) srrBtn.style.display = CONFIG?.SEERR?.SEERR_ENABLED           ? "" : "none"
     // On Wishlist tab: swap "Add to Wishlist" → "Remove from Wishlist"
     if (wlBtn) {
       if (ACTIVE_TAB === "wishlist") {
@@ -206,6 +208,43 @@ async function batchAddToJellyseerr() {
   }
   toast(`Jellyseerr: ${ok} requested${fail ? `, ${fail} failed` : ""}`, ok ? "success" : "error")
   clearSelection()
+}
+
+async function batchAddToSeerr() {
+  if (!CONFIG?.SEERR?.SEERR_ENABLED) { toast("Seerr not enabled", "error"); return }
+  let ok = 0, fail = 0
+  for (const [tmdb] of _selected) {
+    const res = await api("/api/seerr/add", "POST", { tmdb })
+    res.ok ? ok++ : fail++
+  }
+  toast(`Seerr: ${ok} requested${fail ? `, ${fail} failed` : ""}`, ok ? "success" : "error")
+  clearSelection()
+}
+
+/* ── Radarr library (Search vs Add) ────────────────────────── */
+
+/** Set of TMDB IDs currently in Radarr — null while still loading. */
+let _radarrLibTmdbIds = null
+
+async function _fetchRadarrLibrary() {
+  if (!CONFIG?.RADARR?.RADARR_ENABLED) { _radarrLibTmdbIds = new Set(); return }
+  try {
+    const res = await api("/api/radarr/library")
+    _radarrLibTmdbIds = res.ok ? new Set(res.tmdb_ids) : new Set()
+  } catch { _radarrLibTmdbIds = new Set() }
+}
+
+async function searchInRadarr(tmdb, title, btn) {
+  btn.disabled = true; btn.textContent = "…"
+  const res = await api("/api/radarr/search", "POST", { tmdb, title })
+  if (res.ok) {
+    btn.textContent = "✓ Searching"
+    btn.style.color = "var(--green)"
+    toast(`${title} — search triggered in Radarr`, "success")
+  } else {
+    btn.textContent = "⟳ Search"; btn.disabled = false
+    toast(`Radarr search: ${res.error || "unknown error"}`, "error")
+  }
 }
 
 /* ── In-memory DATA helpers ─────────────────────────────────── */
@@ -506,6 +545,7 @@ function _makeSeerrStore(key) {
 }
 const overseerrRequested   = _makeSeerrStore("cp-overseerr-requested")
 const jellyseerrRequested  = _makeSeerrStore("cp-jellyseerr-requested")
+const seerrRequested       = _makeSeerrStore("cp-seerr-requested")
 
 async function addToOverseerr(tmdb, title, btn){
   btn.disabled = true; btn.textContent = "…"
@@ -536,6 +576,22 @@ async function addToJellyseerr(tmdb, title, btn){
   } else {
     btn.textContent = "✗"; btn.disabled = false
     toast(`Jellyseerr: ${res.error||"unknown error"}`,"error")
+  }
+}
+
+async function addToSeerr(tmdb, title, btn){
+  btn.disabled = true; btn.textContent = "…"
+  const res = await api("/api/seerr/add","POST",{tmdb,title})
+  if (res.ok){
+    seerrRequested.add(tmdb)
+    btn.textContent = "✓ Requested"
+    btn.className   = "btn-sm"
+    btn.style.color = "var(--green)"
+    btn.disabled    = true
+    toast(`${title} → Seerr`,"success")
+  } else {
+    btn.textContent = "✗"; btn.disabled = false
+    toast(`Seerr: ${res.error||"unknown error"}`,"error")
   }
 }
 

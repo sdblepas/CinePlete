@@ -366,8 +366,10 @@ async function boot(){
     }
   } catch(e) {}
 
-  if (CONFIGURED) await loadResults()
-  else { setStatus("Setup required"); render() }
+  if (CONFIGURED) {
+    await loadResults()
+    _fetchRadarrLibrary()   // background fetch — no await, updates cards on next render
+  } else { setStatus("Setup required"); render() }
 }
 
 async function logout() {
