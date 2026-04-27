@@ -130,16 +130,21 @@ function _initGroupFilter(groups){
 }
 function getSort(){ return document.getElementById("sort")?.value || "popularity" }
 
-function applyFilters(list){
-  const search = (document.getElementById("search")?.value||"").toLowerCase().trim()
-  const year   = document.getElementById("yearFilter")?.value || ""
-  const sort   = getSort()
+function applyFilters(list, { skipWatchedFilter = false } = {}){
+  const search     = (document.getElementById("search")?.value||"").toLowerCase().trim()
+  const year       = document.getElementById("yearFilter")?.value || ""
+  const sort       = getSort()
+  const hideWatched = !skipWatchedFilter
+    && CONFIG?.TRAKT?.TRAKT_ENABLED
+    && CONFIG?.TRAKT?.TRAKT_HIDE_WATCHED
+    && _traktWatchedIds != null
 
   let out = list.filter(m => {
     if (search && !(m.title||"").toLowerCase().includes(search)) return false
     if (year && yearBucket(m.year) !== year) return false
     if (_activeGenreFilter && !(m.genre_ids||[]).includes(parseInt(_activeGenreFilter))) return false
     if (_activeRatingFilter > 0 && (m.rating||0) < _activeRatingFilter) return false
+    if (hideWatched && _traktWatchedIds.has(m.tmdb)) return false
     return true
   })
 

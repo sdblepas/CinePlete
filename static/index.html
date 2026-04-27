@@ -697,6 +697,17 @@
     .pc:hover .pc-check, .pc-check:checked { opacity: 1; }
     .pc.selected { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-glow); }
 
+    /* Trakt watched overlay */
+    .watched-badge {
+      position: absolute; bottom: 2.6rem; left: 0; right: 0; z-index: 5;
+      background: rgba(237,34,36,.82); color: #fff;
+      font-size: .6rem; font-weight: 700; letter-spacing: .04em;
+      text-align: center; padding: 3px 0;
+      pointer-events: none;
+    }
+    .pc-watched { opacity: .55; }
+    .pc-watched:hover { opacity: 1; }
+
     /* ── MOVIE DETAIL MODAL ───────────────────── */
     #movieModal {
       position: fixed; inset: 0; z-index: 2000;

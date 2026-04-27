@@ -117,6 +117,17 @@ DEFAULT_CONFIG = {
         # ISO 3166-1 alpha-2 country code used to look up JustWatch availability
         "STREAMING_COUNTRY": "US",
     },
+    "TRAKT": {
+        "TRAKT_ENABLED":       False,
+        "TRAKT_CLIENT_ID":     "",
+        "TRAKT_CLIENT_SECRET": "",
+        # Managed by the device-code OAuth flow — not user-editable
+        "TRAKT_ACCESS_TOKEN":  "",
+        "TRAKT_REFRESH_TOKEN": "",
+        "TRAKT_USERNAME":      "",
+        # true = hide watched from grids; false = show with a badge
+        "TRAKT_HIDE_WATCHED":  False,
+    },
     "AUTH": {
         # "None" | "Forms" | "DisabledForLocalAddresses"
         "AUTH_METHOD": "None",
