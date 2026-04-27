@@ -369,7 +369,10 @@ async function boot(){
   if (CONFIGURED) {
     await loadResults()
     _fetchRadarrLibrary()   // background fetch — no await, updates cards on next render
-    _fetchTraktWatched()    // background fetch — no await, populates watched overlay
+    // Re-render after watched ids arrive so badges show on the initial tab after refresh
+    _fetchTraktWatched().then(() => {
+      if (ACTIVE_TAB && !["config","logs"].includes(ACTIVE_TAB)) render()
+    })
   } else { setStatus("Setup required"); render() }
 }
 

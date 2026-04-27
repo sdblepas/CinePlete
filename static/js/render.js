@@ -436,6 +436,12 @@ function renderGroupedList({ groups, nameKey, nameIcon, ignoreHandler, emptyMsg,
       sorted = sorted.filter(m => (m.rating||0) >= ratingMin)
     }
 
+    // Hide watched — same rule as applyFilters() but applied to the group's missing list
+    if (CONFIG?.TRAKT?.TRAKT_ENABLED && CONFIG?.TRAKT?.TRAKT_HIDE_WATCHED
+        && _traktWatchedIds != null) {
+      sorted = sorted.filter(m => !_traktWatchedIds.has(m.tmdb))
+    }
+
     if (!sorted.length) return
 
     const groupTab = `${ACTIVE_TAB}-${name}`
