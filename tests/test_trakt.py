@@ -138,12 +138,19 @@ class TestFetchWatched:
             result = self._call("cid", "tok")
         assert result is None
 
-    def test_returns_empty_list_on_network_error(self):
+    def test_returns_false_on_network_error(self):
         import requests as req
         with patch("app.routers.trakt.requests.get") as mock_get:
             mock_get.side_effect = req.exceptions.RequestException("err")
             result = self._call("cid", "tok")
-        assert result == []
+        assert result is False
+
+    def test_returns_false_on_non_200_non_401(self):
+        """429, 5xx etc. must not be confused with an empty watch history."""
+        with patch("app.routers.trakt.requests.get") as mock_get:
+            mock_get.return_value = _make_response(429)
+            result = self._call("cid", "tok")
+        assert result is False
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +404,44 @@ class TestWatched:
 
         assert res.json()["tmdb_ids"] == [42, 43]
         mock_load.assert_not_called()   # served from cache without hitting config
+
+    def test_stale_cache_preserved_on_transient_error(self):
+        """A 429 / 5xx / network error must NOT overwrite good cached data with [].
+        This is the regression for issue #73."""
+        from app.routers import trakt as trakt_mod
+        # Prime cache with real data (expired — ts=0 forces a re-fetch)
+        trakt_mod._watched_cache["data"] = {"ok": True, "tmdb_ids": [10, 20, 30]}
+        trakt_mod._watched_cache["ts"]   = 0.0
+
+        with patch("app.routers.trakt.load_config") as mock_load, \
+             patch("app.routers.trakt.requests.get") as mock_get:
+            mock_load.return_value = _cfg()
+            mock_get.return_value  = _make_response(429)   # transient error
+            res = self.client.get("/api/trakt/watched")
+
+        data = res.json()
+        # Must return the stale good data, not an empty list
+        assert data["ok"] is True
+        assert set(data["tmdb_ids"]) == {10, 20, 30}
+        # Cache must NOT have been overwritten with []
+        assert trakt_mod._watched_cache["ts"] == 0.0
+
+    def test_empty_result_not_cached_on_fetch_error(self):
+        """When the cache is cold and the fetch fails, return [] but do not cache it
+        so the next request tries again immediately."""
+        from app.routers import trakt as trakt_mod
+        trakt_mod._watched_cache["data"] = None
+        trakt_mod._watched_cache["ts"]   = 0.0
+
+        with patch("app.routers.trakt.load_config") as mock_load, \
+             patch("app.routers.trakt.requests.get") as mock_get:
+            mock_load.return_value = _cfg()
+            mock_get.return_value  = _make_response(500)
+            res = self.client.get("/api/trakt/watched")
+
+        assert res.json() == {"ok": True, "tmdb_ids": []}
+        # Cache timestamp must remain 0 so the next call retries
+        assert trakt_mod._watched_cache["ts"] == 0.0
 
 
 # ---------------------------------------------------------------------------

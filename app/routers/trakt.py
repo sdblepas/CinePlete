@@ -75,8 +75,15 @@ def _refresh_access_token(cfg: dict) -> dict | None:
     return None
 
 
-def _fetch_watched(client_id: str, access_token: str) -> list[int]:
-    """Return list of TMDB IDs from the authenticated user's watched movies."""
+def _fetch_watched(client_id: str, access_token: str):
+    """Return watched TMDB IDs, or a sentinel on failure.
+
+    Return values:
+      list[int]  — success; empty list means the user genuinely watched nothing
+      None       — HTTP 401: access token expired, caller should refresh
+      False      — transient error (network, rate-limit, server error);
+                   caller must NOT cache this as "0 movies"
+    """
     try:
         r = requests.get(
             f"{_TRAKT_BASE}/users/me/watched/movies",
@@ -92,9 +99,10 @@ def _fetch_watched(client_id: str, access_token: str) -> list[int]:
                 if tmdb_id:
                     tmdb_ids.append(int(tmdb_id))
             return tmdb_ids
+        log.warning(f"Trakt watched fetch returned HTTP {r.status_code}")
     except requests.exceptions.RequestException as e:
         log.warning(f"Trakt watched fetch failed: {e}")
-    return []
+    return False   # transient error — do not cache
 
 
 # ---------------------------------------------------------------------------
@@ -267,13 +275,21 @@ def trakt_watched():
     tmdb_ids = _fetch_watched(client_id, access_token)
 
     if tmdb_ids is None:
-        # 401 — try a token refresh
+        # 401 — try a token refresh then retry once
         refreshed = _refresh_access_token(cfg)
         if refreshed:
             access_token = refreshed.get("TRAKT_ACCESS_TOKEN", "")
-            tmdb_ids = _fetch_watched(client_id, access_token) or []
+            tmdb_ids = _fetch_watched(client_id, access_token)
         else:
-            tmdb_ids = []
+            tmdb_ids = False   # refresh failed — treat as transient error
+
+    if tmdb_ids is False:
+        # Transient error: do NOT cache an empty result.
+        # Return stale data when available so badges stay visible.
+        log.warning("Trakt: watch fetch failed — keeping stale cache")
+        if _watched_cache["data"] is not None:
+            return _watched_cache["data"]
+        return {"ok": True, "tmdb_ids": []}
 
     result = {"ok": True, "tmdb_ids": tmdb_ids}
     _watched_cache.update({"data": result, "ts": now})
