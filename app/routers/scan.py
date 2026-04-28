@@ -40,12 +40,17 @@ def api_results():
             "message":    "First scan started — poll /api/scan/status for progress",
         }
 
-    # Re-apply ignore_movies at serve time so movies ignored since the last
-    # scan don't reappear on browser refresh (the scanner already strips them
-    # at scan time, but results.json can become stale between scans).
+    # Re-apply all ignore lists at serve time so ignored items don't reappear
+    # on browser refresh when results.json is stale (i.e. the user ignored
+    # something after the last scan but before the next one).
     try:
-        ov          = _load_overrides(OVERRIDES_FILE)
-        ignored_ids = set(ov.get("ignore_movies", []))
+        ov                 = _load_overrides(OVERRIDES_FILE)
+        ignored_ids        = set(ov.get("ignore_movies",    []))
+        ignored_franchises = set(ov.get("ignore_franchises", []))
+        ignored_directors  = set(ov.get("ignore_directors",  []))
+        ignored_actors     = set(ov.get("ignore_actors",     []))
+
+        # Strip ignored individual movies from flat lists
         if ignored_ids:
             for key in ("classics", "suggestions"):
                 if key in data:
@@ -59,6 +64,30 @@ def api_results():
                         m for m in group.get("missing", [])
                         if m.get("tmdb") not in ignored_ids
                     ]
+
+        # Strip ignored whole groups (franchises / directors / actors)
+        if "franchises" in data:
+            data["franchises"] = [
+                f for f in data["franchises"]
+                if f.get("name") not in ignored_franchises
+            ]
+        if "directors" in data:
+            data["directors"] = [
+                d for d in data["directors"]
+                if d.get("name") not in ignored_directors
+            ]
+        if "actors" in data:
+            data["actors"] = [
+                a for a in data["actors"]
+                if a.get("name") not in ignored_actors
+            ]
+
+        # Keep _ignored_* fields in sync with overrides (they can be stale
+        # in results.json if a group was ignored between scans).
+        data["_ignored_franchises"] = list(ignored_franchises)
+        data["_ignored_directors"]  = list(ignored_directors)
+        data["_ignored_actors"]     = list(ignored_actors)
+
     except Exception:
         pass   # never block the response if overrides are unreadable
 

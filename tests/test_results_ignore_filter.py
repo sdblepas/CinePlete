@@ -36,7 +36,15 @@ _RESULTS = {
                 {"tmdb": 1001, "title": "Alien Romulus", "year": "2024"},
                 {"tmdb": 1002, "title": "Alien Covenant", "year": "2017"},
             ],
-        }
+        },
+        {
+            "name": "The Fast and the Furious Collection",
+            "have": 8, "total": 11,
+            "missing": [
+                {"tmdb": 1101, "title": "The Fate of the Furious", "year": "2017"},
+                {"tmdb": 1102, "title": "F9",                       "year": "2021"},
+            ],
+        },
     ],
     "directors": [
         {
@@ -45,7 +53,13 @@ _RESULTS = {
                 {"tmdb": 2001, "title": "Following",  "year": "1998"},
                 {"tmdb": 2002, "title": "Insomnia",   "year": "2002"},
             ],
-        }
+        },
+        {
+            "name": "Steven Spielberg",
+            "missing": [
+                {"tmdb": 2101, "title": "Duel", "year": "1971"},
+            ],
+        },
     ],
     "actors": [
         {
@@ -54,7 +68,13 @@ _RESULTS = {
                 {"tmdb": 3001, "title": "Cast Away",    "year": "2000"},
                 {"tmdb": 3002, "title": "Philadelphia", "year": "1993"},
             ],
-        }
+        },
+        {
+            "name": "Meryl Streep",
+            "missing": [
+                {"tmdb": 3101, "title": "Kramer vs. Kramer", "year": "1979"},
+            ],
+        },
     ],
     "classics":    [{"tmdb": 4001, "title": "2001: A Space Odyssey"}, {"tmdb": 4002, "title": "Metropolis"}],
     "suggestions": [{"tmdb": 5001, "title": "Blade Runner"},          {"tmdb": 5002, "title": "Akira"}],
@@ -76,6 +96,14 @@ _OVERRIDES_IGNORING = {
 _OVERRIDES_EMPTY = {
     **_OVERRIDES_IGNORING,
     "ignore_movies": [],
+}
+
+# Overrides where entire groups are ignored (the "Ignore" button on a group header)
+_OVERRIDES_GROUP_IGNORED = {
+    **_OVERRIDES_EMPTY,
+    "ignore_franchises": ["The Fast and the Furious Collection", "Alien Collection"],
+    "ignore_directors":  ["Christopher Nolan"],
+    "ignore_actors":     ["Tom Hanks"],
 }
 
 
@@ -183,3 +211,65 @@ class TestSearchIgnoreFilter:
         ids  = [r["tmdb"] for r in data["results"]]
         assert 1001 in ids
         assert 1002 in ids
+
+
+# ---------------------------------------------------------------------------
+# /api/results — group-level ignore filtering (franchise / director / actor)
+# ---------------------------------------------------------------------------
+
+class TestResultsGroupIgnoreFilter:
+    """
+    Regression for the 'Ignore' button on a collection/director/actor header:
+    the whole group must disappear after browser refresh, not just lose its
+    movies individually.
+    """
+
+    def _get(self, overrides: dict):
+        return _make_client(overrides)
+
+    def test_ignored_franchise_group_removed(self):
+        data = self._get(_OVERRIDES_GROUP_IGNORED)
+        names = [f["name"] for f in data["franchises"]]
+        assert "The Fast and the Furious Collection" not in names
+        assert "Alien Collection"                    not in names
+        # unignored franchise must still be present (none in this fixture — both are ignored)
+
+    def test_non_ignored_franchise_group_kept(self):
+        # Only "Alien Collection" and "Fast & Furious" are ignored — other franchises stay
+        overrides = {**_OVERRIDES_GROUP_IGNORED, "ignore_franchises": ["Alien Collection"]}
+        data = self._get(overrides)
+        names = [f["name"] for f in data["franchises"]]
+        assert "Alien Collection"                    not in names
+        assert "The Fast and the Furious Collection" in names
+
+    def test_ignored_director_group_removed(self):
+        data = self._get(_OVERRIDES_GROUP_IGNORED)
+        names = [d["name"] for d in data["directors"]]
+        assert "Christopher Nolan" not in names
+        assert "Steven Spielberg"  in names     # not ignored
+
+    def test_ignored_actor_group_removed(self):
+        data = self._get(_OVERRIDES_GROUP_IGNORED)
+        names = [a["name"] for a in data["actors"]]
+        assert "Tom Hanks"    not in names
+        assert "Meryl Streep" in names           # not ignored
+
+    def test_ignored_franchises_field_reflects_overrides(self):
+        """_ignored_franchises in the response must come from overrides, not stale results.json."""
+        data = self._get(_OVERRIDES_GROUP_IGNORED)
+        assert "The Fast and the Furious Collection" in data["_ignored_franchises"]
+        assert "Alien Collection"                    in data["_ignored_franchises"]
+
+    def test_ignored_directors_field_reflects_overrides(self):
+        data = self._get(_OVERRIDES_GROUP_IGNORED)
+        assert "Christopher Nolan" in data["_ignored_directors"]
+
+    def test_ignored_actors_field_reflects_overrides(self):
+        data = self._get(_OVERRIDES_GROUP_IGNORED)
+        assert "Tom Hanks" in data["_ignored_actors"]
+
+    def test_no_group_filtering_when_all_lists_empty(self):
+        data = self._get(_OVERRIDES_EMPTY)
+        assert len(data["franchises"]) == 2
+        assert len(data["directors"])  == 2
+        assert len(data["actors"])     == 2
