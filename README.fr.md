@@ -8,7 +8,7 @@
 ![Plex](https://img.shields.io/badge/Plex-compatible-orange)
 ![Jellyfin](https://img.shields.io/badge/Jellyfin-compatible-7B2FBE)
 ![Emby](https://img.shields.io/badge/Emby-compatible-00A4DC)
-![Trakt](https://img.shields.io/badge/Trakt-integration-ED2224)
+![Trakt](https://img.shields.io/badge/Trakt-integration-ED2224?logo=trakt&logoColor=white)
 ![Proxmox](https://img.shields.io/badge/Proxmox-LXC--ready-E57000?logo=proxmox&logoColor=white)
 
 > 🇬🇧 [English version](README.md)

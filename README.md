@@ -17,7 +17,7 @@
 ![Radarr](https://img.shields.io/badge/Radarr-integration-purple)
 ![Overseerr](https://img.shields.io/badge/Overseerr-integration-F59E0B)
 ![Jellyseerr](https://img.shields.io/badge/Jellyseerr-integration-29B4E8)
-![Trakt](https://img.shields.io/badge/Trakt-integration-ED2224)
+![Trakt](https://img.shields.io/badge/Trakt-integration-ED2224?logo=trakt&logoColor=white)
 ![Watchtower](https://img.shields.io/badge/Watchtower-auto--update-2496ED)
 ![TMDB](https://img.shields.io/badge/TMDB-API-blue)
 ![Homelab](https://img.shields.io/badge/homelab-friendly-blue)
