@@ -15,7 +15,7 @@
 ![Jellyfin](https://img.shields.io/badge/Jellyfin-compatible-7B2FBE)
 ![Emby](https://img.shields.io/badge/Emby-compatible-00A4DC)
 ![Radarr](https://img.shields.io/badge/Radarr-integration-purple)
-![Overseerr](https://img.shields.io/badge/Overseerr-integration-F59E0B)
+![Overseerr](https://img.shields.io/badge/Overseerr-integration-F59E0B?logo=overseerr&logoColor=white)
 ![Jellyseerr](https://img.shields.io/badge/Jellyseerr-integration-29B4E8)
 ![Trakt](https://img.shields.io/badge/Trakt-integration-ED2224?logo=trakt&logoColor=white)
 ![Watchtower](https://img.shields.io/badge/Watchtower-auto--update-2496ED)
