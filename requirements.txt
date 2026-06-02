@@ -1,8 +1,8 @@
-fastapi==0.136.1
-uvicorn==0.47.0
+fastapi==0.136.3
+uvicorn==0.48.0
 requests==2.34.2
 pyyaml==6.0.2
 apscheduler==3.10.4
 defusedxml==0.7.1
-zipp==3.23.1
+zipp==4.1.0
 httpx==0.28.1
