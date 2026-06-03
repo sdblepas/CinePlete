@@ -393,7 +393,8 @@ function renderConfig(){
           API keys allow external tools (n8n, Home Assistant, scripts) to call the
           CinePlete API without a browser session.<br>
           Pass the key as an <code style="color:var(--gold)">X-Api-Key</code> request header
-          or a <code style="color:var(--gold)">?apikey=</code> query parameter.
+          or a <code style="color:var(--gold)">?apikey=</code> query parameter.<br>
+          <span style="color:var(--amber,#f59e0b)">⚠ Keys are only enforced when Auth Mode is set to Forms or DisabledForLocalAddresses.</span>
         </p>
         <div id="apikeys-list" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.75rem"></div>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
@@ -1005,7 +1006,31 @@ async function createApiKey() {
 
 function copyApiKey() {
   const val = document.getElementById("apikey-new-value")?.textContent || ""
-  navigator.clipboard?.writeText(val).then(() => toast("Key copied to clipboard", "success"))
+  if (!val) return
+  // navigator.clipboard requires HTTPS or localhost — use execCommand fallback for HTTP
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(val)
+      .then(() => toast("Key copied to clipboard", "success"))
+      .catch(() => _copyFallback(val))
+  } else {
+    _copyFallback(val)
+  }
+}
+
+function _copyFallback(text) {
+  const ta = document.createElement("textarea")
+  ta.value = text
+  ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0"
+  document.body.appendChild(ta)
+  ta.focus()
+  ta.select()
+  try {
+    document.execCommand("copy")
+    toast("Key copied to clipboard", "success")
+  } catch {
+    toast("Could not copy — please select and copy manually", "error")
+  }
+  document.body.removeChild(ta)
 }
 
 async function revokeApiKey(id, name, btn) {
