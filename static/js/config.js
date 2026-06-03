@@ -387,6 +387,37 @@ function renderConfig(){
           : hint("No password set yet. Enter one to enable login.")}
       </div>
 
+      <div class="form-section">
+        ${sec('API Keys <span style="font-size:.75rem;font-weight:400;color:var(--text3)">(optional)</span>')}
+        <p style="color:var(--text3);font-size:.75rem;margin:0 0 .75rem">
+          API keys allow external tools (n8n, Home Assistant, scripts) to call the
+          CinePlete API without a browser session.<br>
+          Pass the key as an <code style="color:var(--gold)">X-Api-Key</code> request header
+          or a <code style="color:var(--gold)">?apikey=</code> query parameter.<br>
+          <span style="color:var(--amber,#f59e0b)">⚠ Keys are only enforced when Auth Mode is set to Forms or DisabledForLocalAddresses.</span>
+        </p>
+        <div id="apikeys-list" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.75rem"></div>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <input id="apikey-name-input" class="form-input" type="text" placeholder="Key name (e.g. Home Assistant)"
+            style="flex:1;min-width:160px;max-width:280px;font-size:.8rem;padding:.35rem .55rem"/>
+          <button class="btn-sm" style="font-size:.72rem;padding:5px 14px;white-space:nowrap;
+            border-color:rgba(229,160,13,.3);color:var(--gold)"
+            onclick="createApiKey()">+ Generate key</button>
+        </div>
+        <div id="apikey-new-box" style="display:none;margin-top:.75rem;padding:.6rem .75rem;
+          background:var(--bg3);border:1px solid rgba(229,160,13,.3);border-radius:8px">
+          <p style="color:var(--text3);font-size:.72rem;margin:0 0 .4rem">
+            ⚠ Copy this key now — it will not be shown again.
+          </p>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <code id="apikey-new-value" style="flex:1;font-size:.75rem;color:var(--gold);
+              word-break:break-all;font-family:'DM Mono',monospace"></code>
+            <button class="btn-sm" style="font-size:.7rem;padding:4px 10px;flex-shrink:0"
+              onclick="copyApiKey()">Copy</button>
+          </div>
+        </div>
+      </div>
+
       <div class="form-section" id="libraries-section">
         ${sec("Libraries")}
         <div id="lib-list">
@@ -584,6 +615,7 @@ function renderConfig(){
   </div>`
 
   loadCacheInfo()
+  loadApiKeys()
 }
 
 async function saveConfig(){
@@ -926,3 +958,92 @@ async function traktRefreshWatched(btn) {
   // Update cards on the current tab
   if (typeof render !== "undefined" && !["config","logs"].includes(ACTIVE_TAB)) render()
 }
+
+/* ── API Key management ─────────────────────────────────────── */
+
+async function loadApiKeys() {
+  const container = document.getElementById("apikeys-list")
+  if (!container) return
+  const res = await api("/api/apikeys")
+  if (!res.ok) return
+  const keys = res.keys || []
+  if (!keys.length) {
+    container.innerHTML = `<p style="color:var(--text3);font-size:.75rem;margin:0">No API keys yet.</p>`
+    return
+  }
+  container.innerHTML = keys.map(k => {
+    const date = new Date(k.created_at * 1000).toLocaleDateString()
+    return `
+      <div class="meta-item" style="justify-content:space-between;gap:.5rem" id="apikey-row-${escHtml(k.id)}">
+        <div style="min-width:0">
+          <span style="font-size:.8rem;color:var(--text)">${escHtml(k.name)}</span>
+          <span style="font-size:.72rem;color:var(--text3);margin-left:.5rem;font-family:'DM Mono',monospace">${escHtml(k.preview)}</span>
+          <span style="font-size:.68rem;color:var(--text3);margin-left:.5rem">created ${date}</span>
+        </div>
+        <button class="btn-sm btn-ignore" style="font-size:.7rem;padding:3px 10px;flex-shrink:0"
+          onclick="revokeApiKey('${escHtml(k.id)}','${escHtml(k.name)}',this)">Revoke</button>
+      </div>`
+  }).join("")
+}
+
+async function createApiKey() {
+  const nameInput = document.getElementById("apikey-name-input")
+  const name = nameInput?.value?.trim() || "Unnamed key"
+  const res = await api("/api/apikeys", "POST", { name })
+  if (!res.ok) { toast(res.error || "Failed to create key", "error"); return }
+
+  // Show the raw key once
+  const box = document.getElementById("apikey-new-box")
+  const val = document.getElementById("apikey-new-value")
+  if (box && val) {
+    val.textContent = res.key
+    box.style.display = "block"
+  }
+  if (nameInput) nameInput.value = ""
+  toast(`API key "${res.name}" created — copy it now`, "success")
+  loadApiKeys()
+}
+
+function copyApiKey() {
+  const val = document.getElementById("apikey-new-value")?.textContent || ""
+  if (!val) return
+  // navigator.clipboard requires HTTPS or localhost — use execCommand fallback for HTTP
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(val)
+      .then(() => toast("Key copied to clipboard", "success"))
+      .catch(() => _copyFallback(val))
+  } else {
+    _copyFallback(val)
+  }
+}
+
+function _copyFallback(text) {
+  const ta = document.createElement("textarea")
+  ta.value = text
+  ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0"
+  document.body.appendChild(ta)
+  ta.focus()
+  ta.select()
+  try {
+    document.execCommand("copy")
+    toast("Key copied to clipboard", "success")
+  } catch {
+    toast("Could not copy — please select and copy manually", "error")
+  }
+  document.body.removeChild(ta)
+}
+
+async function revokeApiKey(id, name, btn) {
+  if (!confirm(`Revoke API key "${name}"? Any tool using it will lose access.`)) return
+  btn.disabled = true
+  const res = await api(`/api/apikeys/${id}`, "DELETE")
+  if (res.ok) {
+    const row = document.getElementById(`apikey-row-${id}`)
+    if (row) { row.style.opacity = "0"; row.style.transition = "opacity .3s"; setTimeout(() => { row.remove(); loadApiKeys() }, 320) }
+    toast(`API key "${name}" revoked`, "info")
+  } else {
+    btn.disabled = false
+    toast(res.error || "Failed to revoke key", "error")
+  }
+}
+

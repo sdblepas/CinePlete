@@ -14,10 +14,10 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import load_config
-from app.auth import COOKIE_NAME, get_client_ip, is_local_address, verify_token
+from app.auth import COOKIE_NAME, get_client_ip, is_local_address, verify_token, verify_api_key
 from app import scheduler
 
-from app.routers import auth, config, scan, overrides, letterboxd, integrations, cache, theaters, streaming, quality, trakt
+from app.routers import auth, config, scan, overrides, letterboxd, integrations, cache, theaters, streaming, quality, trakt, api_keys
 
 _BASE_DIR  = Path(__file__).resolve().parent.parent
 STATIC_DIR = os.getenv("STATIC_DIR", str(_BASE_DIR / "static"))
@@ -65,6 +65,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if is_local_address(get_client_ip(request)):
                 return await call_next(request)
 
+        # Validate API key (X-Api-Key header or ?apikey= query param)
+        api_key = (request.headers.get("X-Api-Key")
+                   or request.query_params.get("apikey", ""))
+        if api_key and verify_api_key(api_key, cfg.get("API_KEYS", [])):
+            return await call_next(request)
+
         # Validate session cookie
         token  = request.cookies.get(COOKIE_NAME, "")
         secret = auth_cfg.get("AUTH_SECRET_KEY", "")
@@ -94,3 +100,4 @@ app.include_router(theaters.router)
 app.include_router(streaming.router)
 app.include_router(quality.router)
 app.include_router(trakt.router)
+app.include_router(api_keys.router)

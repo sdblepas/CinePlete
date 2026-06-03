@@ -144,3 +144,37 @@ def verify_token(token: str, secret: str) -> dict | None:
 
 def generate_secret_key() -> str:
     return secrets.token_hex(32)
+
+
+# ---------------------------------------------------------------------------
+# API key helpers
+# ---------------------------------------------------------------------------
+
+API_KEY_PREFIX = "cp_"
+
+
+def generate_api_key() -> str:
+    """Return a new raw API key: cp_<64 hex chars>."""
+    return API_KEY_PREFIX + secrets.token_hex(32)
+
+
+def hash_api_key(raw_key: str) -> str:
+    """SHA-256 hash of the raw key (hex digest). Never store the raw key."""
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def key_preview(raw_key: str) -> str:
+    """Safe display string: cp_XXXXXXXX…XXXX (first 8 + last 4 chars of token)."""
+    token = raw_key[len(API_KEY_PREFIX):]   # strip prefix
+    return f"{API_KEY_PREFIX}{token[:8]}…{token[-4:]}"
+
+
+def verify_api_key(raw_key: str, stored_keys: list) -> bool:
+    """Return True if *raw_key* matches any entry in *stored_keys*."""
+    if not raw_key or not stored_keys:
+        return False
+    key_hash = hash_api_key(raw_key)
+    return any(
+        secrets.compare_digest(key_hash, entry.get("key_hash", ""))
+        for entry in stored_keys
+    )

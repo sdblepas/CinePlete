@@ -139,6 +139,9 @@ DEFAULT_CONFIG = {
         # Only set this if CinePlete sits behind a known reverse proxy.
         "TRUSTED_PROXIES": "",
     },
+    # List of API keys for headless access (n8n, Home Assistant, scripts…).
+    # Each entry: {id, name, key_hash, created_at}  — raw key never stored.
+    "API_KEYS": [],
 }
 
 
