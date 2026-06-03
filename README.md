@@ -391,10 +391,71 @@ CinePlete supports Radarr-style authentication, configurable from **Config → A
 - Passwords hashed with **PBKDF2-SHA256** — never stored in plain text
 - **7-day sliding session cookie** — stay logged in across browser sessions
 - **"Trust this browser"** toggle — persistent vs session cookie
-- API key auth via `X-Api-Key` header or `?access_token=` query param (for integrations)
 - Logout button in the sidebar footer
 
 > Auth defaults to **None** — existing deployments are unaffected until you configure it.
+
+---
+
+### API Key Authentication
+
+Generate named API keys from **Config → API Keys** to allow headless access from external tools (n8n, Home Assistant, scripts, cron jobs) without a browser session.
+
+**Usage — pass the key in any request:**
+
+```bash
+# Header (recommended)
+curl -H "X-Api-Key: cp_YOUR_KEY" http://your-server/api/results
+
+# Query parameter
+curl "http://your-server/api/results?apikey=cp_YOUR_KEY"
+```
+
+> Keys are only enforced when Auth Mode is set to **Forms** or **Local network free**. With Auth Mode **None**, the API is open regardless.
+
+**Key format:** `cp_` prefix + 64 random hex characters. Only the SHA-256 hash is stored — the raw key is shown once at creation and cannot be recovered.
+
+**All endpoints accessible with an API key:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/results` | Full scan results (all tabs) |
+| POST | `/api/scan` | Trigger a background scan |
+| GET | `/api/scan/status` | Live scan progress |
+| GET | `/api/export` | Export to CSV or Letterboxd format |
+| GET | `/api/search` | Full-text search across all tabs |
+| GET | `/api/movie/{tmdb_id}` | Movie detail (metadata, cast, trailer) |
+| GET | `/api/config` | Current configuration |
+| POST | `/api/config` | Save configuration |
+| POST | `/api/ignore` | Ignore a movie / franchise / director / actor |
+| POST | `/api/unignore` | Remove an ignore |
+| GET | `/api/ignored` | List all ignored items |
+| POST | `/api/wishlist/add` | Add movie to wishlist |
+| POST | `/api/wishlist/remove` | Remove from wishlist |
+| POST | `/api/radarr/add` | Send movie to Radarr |
+| POST | `/api/overseerr/add` | Request movie in Overseerr |
+| POST | `/api/jellyseerr/add` | Request movie in Jellyseerr |
+| GET | `/api/streaming/{tmdb_id}` | JustWatch streaming availability |
+| GET | `/api/theaters` | Now-playing + upcoming films |
+| GET | `/api/quality/upgrades` | Movies eligible for 4K upgrade |
+| GET | `/api/trakt/watched` | Trakt watched movie IDs |
+| POST | `/api/trakt/watched/refresh` | Bust Trakt watched cache |
+| GET | `/api/trakt/status` | Trakt connection state |
+| GET | `/api/trakt/debug` | Trakt diagnostic info |
+| GET | `/api/letterboxd/urls` | Saved Letterboxd URLs |
+| POST | `/api/letterboxd/urls` | Add a Letterboxd URL |
+| POST | `/api/letterboxd/urls/remove` | Remove a Letterboxd URL |
+| GET | `/api/letterboxd/movies` | Scored Letterboxd movie list |
+| POST | `/api/letterboxd/refresh` | Refresh Letterboxd cache |
+| GET | `/api/logs` | Last N lines of cineplete.log |
+| GET | `/api/cache/info` | TMDB cache file info |
+| POST | `/api/cache/backup` | Backup TMDB cache |
+| POST | `/api/cache/restore` | Restore TMDB cache from backup |
+| GET | `/api/apikeys` | List API keys (no hashes exposed) |
+| POST | `/api/apikeys` | Generate a new API key |
+| DELETE | `/api/apikeys/{id}` | Revoke an API key |
+| POST | `/api/webhook` | Trigger scan via webhook |
+| POST | `/api/watchtower/update` | Trigger Watchtower auto-update |
 
 ---
 
@@ -711,32 +772,61 @@ All persistent data lives in the mounted `/data` volume and survives container u
 
 ## API Endpoints
 
+> All endpoints below are accessible with an **API key** (`X-Api-Key` header or `?apikey=` query param) when auth is enabled. See [API Key Authentication](#api-key-authentication) for details.
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/version` | Returns current app version |
-| GET | `/api/results` | Returns scan results (never blocks) |
-| POST | `/api/scan` | Starts a background scan |
-| GET | `/api/scan/status` | Returns live scan progress (8 steps) |
-| GET | `/api/config` | Returns current config |
-| POST | `/api/config` | Saves config |
+| GET | `/api/version` | Current app version + update check |
+| GET | `/api/results` | Full scan results (all tabs) |
+| POST | `/api/scan` | Start a background scan |
+| GET | `/api/scan/status` | Live scan progress (8 steps) |
+| GET | `/api/export` | Export to CSV or Letterboxd format |
+| GET | `/api/search` | Full-text search across all tabs |
+| GET | `/api/movie/{tmdb_id}` | Movie detail (metadata, cast, trailer) |
+| GET | `/api/config` | Current configuration |
+| POST | `/api/config` | Save configuration |
 | GET | `/api/config/status` | Returns `{configured: bool}` |
-| POST | `/api/ignore` | Ignores a movie / franchise / director / actor |
-| POST | `/api/unignore` | Removes an ignore |
-| GET | `/api/ignored` | Returns ignored movies with title/year/poster metadata |
-| POST | `/api/wishlist/add` | Adds a movie to wishlist |
-| POST | `/api/wishlist/remove` | Removes from wishlist |
-| POST | `/api/radarr/add` | Sends a movie to Radarr |
-| POST | `/api/jellyfin/test` | Tests Jellyfin connectivity and library access |
-| POST | `/api/emby/test` | Tests Emby connectivity and library access |
-| GET | `/api/logs` | Returns last N lines of cineplete.log |
-| POST | `/api/watchtower/update` | Triggers Watchtower to pull latest CinePlete image |
-| GET | `/api/auth/status` | Returns current auth mode and login state |
-| POST | `/api/auth/login` | Authenticates with username + password |
-| POST | `/api/auth/logout` | Clears the session cookie |
-| GET | `/api/letterboxd/urls` | Returns saved Letterboxd URLs |
-| POST | `/api/letterboxd/urls` | Adds a Letterboxd URL |
-| POST | `/api/letterboxd/urls/remove` | Removes a Letterboxd URL |
-| GET | `/api/letterboxd/movies` | Fetches, merges and scores all saved Letterboxd lists |
+| POST | `/api/library/test` | Test Plex / Jellyfin / Emby connection |
+| POST | `/api/ignore` | Ignore a movie / franchise / director / actor |
+| POST | `/api/unignore` | Remove an ignore |
+| GET | `/api/ignored` | List all ignored items with metadata |
+| POST | `/api/wishlist/add` | Add a movie to wishlist |
+| POST | `/api/wishlist/remove` | Remove from wishlist |
+| POST | `/api/radarr/add` | Send a movie to Radarr |
+| GET | `/api/radarr/profiles` | Fetch Radarr quality profiles |
+| GET | `/api/radarr/rootfolders` | Fetch Radarr root folders |
+| GET | `/api/radarr/library` | TMDB IDs of all Radarr movies |
+| GET | `/api/radarr/status` | Per-movie Radarr status |
+| POST | `/api/overseerr/add` | Request a movie in Overseerr |
+| POST | `/api/jellyseerr/add` | Request a movie in Jellyseerr |
+| GET | `/api/streaming/{tmdb_id}` | JustWatch streaming availability |
+| GET | `/api/theaters` | Now-playing + upcoming films |
+| GET | `/api/quality/upgrades` | Movies eligible for 4K upgrade |
+| POST | `/api/quality/refresh` | Bust quality upgrade cache |
+| GET | `/api/trakt/watched` | Trakt watched movie IDs (cached 1 h) |
+| POST | `/api/trakt/watched/refresh` | Bust Trakt watched cache |
+| GET | `/api/trakt/status` | Trakt connection state |
+| GET | `/api/trakt/debug` | Trakt diagnostic info (no tokens exposed) |
+| POST | `/api/trakt/device/code` | Start Trakt device-code OAuth flow |
+| POST | `/api/trakt/device/poll` | Poll Trakt OAuth approval |
+| POST | `/api/trakt/disconnect` | Revoke and clear Trakt tokens |
+| GET | `/api/letterboxd/urls` | Saved Letterboxd URLs |
+| POST | `/api/letterboxd/urls` | Add a Letterboxd URL |
+| POST | `/api/letterboxd/urls/remove` | Remove a Letterboxd URL |
+| GET | `/api/letterboxd/movies` | Scored Letterboxd movie list |
+| POST | `/api/letterboxd/refresh` | Refresh Letterboxd cache |
+| GET | `/api/apikeys` | List API keys (no hashes exposed) |
+| POST | `/api/apikeys` | Generate a new API key |
+| DELETE | `/api/apikeys/{id}` | Revoke an API key |
+| GET | `/api/cache/info` | TMDB cache file age and size |
+| POST | `/api/cache/backup` | Back up TMDB cache |
+| POST | `/api/cache/restore` | Restore TMDB cache from backup |
+| GET | `/api/logs` | Last N lines of cineplete.log |
+| GET | `/api/auth/status` | Current auth mode and login state |
+| POST | `/api/auth/login` | Authenticate with username + password |
+| POST | `/api/auth/logout` | Clear the session cookie |
+| POST | `/api/webhook` | Trigger scan via authenticated webhook |
+| POST | `/api/watchtower/update` | Trigger Watchtower auto-update |
 
 ---
 

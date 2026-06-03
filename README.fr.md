@@ -292,8 +292,64 @@ CinePlete propose une authentification de type Radarr, configurable depuis **Con
 - Mots de passe hashés avec **PBKDF2-SHA256**
 - **Cookie glissant 7 jours** — session persistante entre les navigations
 - Toggle **"Faire confiance à ce navigateur"** — cookie persistant ou de session
-- Auth par clé API via header `X-Api-Key` ou `?access_token=`
 - Bouton de déconnexion dans le pied de la barre latérale
+
+---
+
+### Authentification par clé API
+
+Générez des clés API nommées depuis **Config → API Keys** pour permettre un accès headless depuis des outils externes (n8n, Home Assistant, scripts, cron) sans session navigateur.
+
+**Utilisation — passez la clé dans chaque requête :**
+
+```bash
+# Header (recommandé)
+curl -H "X-Api-Key: cp_VOTRE_CLÉ" http://votre-serveur/api/results
+
+# Paramètre query
+curl "http://votre-serveur/api/results?apikey=cp_VOTRE_CLÉ"
+```
+
+> Les clés ne sont appliquées que si le Mode Auth est **Forms** ou **Local network free**. En mode **None**, l'API est ouverte sans clé.
+
+**Format des clés :** préfixe `cp_` + 64 caractères hexadécimaux aléatoires. Seul le hash SHA-256 est stocké — la clé brute est affichée une seule fois à la création.
+
+**Tous les endpoints accessibles avec une clé API :**
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/api/results` | Résultats complets du scan |
+| POST | `/api/scan` | Déclencher un scan |
+| GET | `/api/scan/status` | Progression du scan en direct |
+| GET | `/api/export` | Exporter en CSV ou format Letterboxd |
+| GET | `/api/search` | Recherche plein texte |
+| GET | `/api/movie/{tmdb_id}` | Détail film (métadonnées, cast, bande-annonce) |
+| GET | `/api/config` | Configuration actuelle |
+| POST | `/api/config` | Sauvegarder la configuration |
+| POST | `/api/ignore` | Ignorer un film / saga / réalisateur / acteur |
+| POST | `/api/unignore` | Retirer un ignore |
+| GET | `/api/ignored` | Liste des éléments ignorés |
+| POST | `/api/wishlist/add` | Ajouter un film à la wishlist |
+| POST | `/api/wishlist/remove` | Retirer de la wishlist |
+| POST | `/api/radarr/add` | Envoyer un film à Radarr |
+| GET | `/api/radarr/status` | Statut Radarr par film |
+| POST | `/api/overseerr/add` | Demander un film dans Overseerr |
+| POST | `/api/jellyseerr/add` | Demander un film dans Jellyseerr |
+| GET | `/api/streaming/{tmdb_id}` | Disponibilité streaming JustWatch |
+| GET | `/api/theaters` | Films en salle et à venir |
+| GET | `/api/quality/upgrades` | Films éligibles à une mise à niveau 4K |
+| GET | `/api/trakt/watched` | IDs TMDB vus sur Trakt |
+| POST | `/api/trakt/watched/refresh` | Vider le cache Trakt |
+| GET | `/api/trakt/status` | État de la connexion Trakt |
+| GET | `/api/trakt/debug` | Diagnostic Trakt |
+| GET | `/api/letterboxd/movies` | Liste Letterboxd scorée |
+| POST | `/api/letterboxd/refresh` | Rafraîchir le cache Letterboxd |
+| GET | `/api/apikeys` | Lister les clés API |
+| POST | `/api/apikeys` | Générer une nouvelle clé API |
+| DELETE | `/api/apikeys/{id}` | Révoquer une clé API |
+| GET | `/api/logs` | Dernières lignes du journal |
+| POST | `/api/webhook` | Déclencher un scan via webhook |
+| POST | `/api/watchtower/update` | Déclencher la mise à jour Watchtower |
 
 ---
 
