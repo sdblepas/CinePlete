@@ -62,7 +62,7 @@ def _radarr_post(
             f"{url}/api/v3/movie",
             json=body,
             headers={"X-Api-Key": api_key},
-            timeout=20,
+            timeout=40,
         )
     except requests.exceptions.RequestException as e:
         return {"ok": False, "error": str(e)}
@@ -211,7 +211,7 @@ def radarr_library():
         return {"ok": True, "tmdb_ids": []}
 
     try:
-        r = requests.get(f"{url}/api/v3/movie", headers={"X-Api-Key": key}, timeout=20)
+        r = requests.get(f"{url}/api/v3/movie", headers={"X-Api-Key": key}, timeout=40)
         if r.status_code == 200:
             tmdb_ids = [int(m["tmdbId"]) for m in r.json() if m.get("tmdbId")]
             result = {"ok": True, "tmdb_ids": tmdb_ids}

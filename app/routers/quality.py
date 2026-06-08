@@ -30,7 +30,7 @@ def _fetch_radarr_movies(url: str, api_key: str) -> list[dict]:
         r = requests.get(
             f"{url}/api/v3/movie",
             headers={"X-Api-Key": api_key},
-            timeout=20,
+            timeout=40,
         )
         if r.status_code == 200:
             return r.json()
