@@ -82,3 +82,5 @@ CLAUDE.md
 # Code Reviews
 # -------------------------
 CODE_REVIEW.txt
+bugforclaude.md
+docker-compose.test.yml
