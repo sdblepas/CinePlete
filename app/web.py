@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.config import load_config
+from app.config import load_config, is_configured
 from app.auth import COOKIE_NAME, get_client_ip, is_local_address, verify_token, verify_api_key
 from app import scheduler
 
@@ -31,6 +31,20 @@ async def lifespan(app: FastAPI):
     cfg      = load_config()
     interval = int(cfg.get("AUTOMATION", {}).get("LIBRARY_POLL_INTERVAL", 30))
     scheduler.start(interval)
+
+    # If the app restarted while a scan was in progress, results.json is left
+    # with scanning=True and stale section statuses ("pending"/"computing").
+    # Relaunch immediately so tabs don't stay stuck at "waiting to start".
+    if is_configured():
+        from app.scanner import read_results, build_async
+        prev = read_results()
+        if prev and prev.get("scanning"):
+            import logging
+            logging.getLogger(__name__).info(
+                "Interrupted scan detected on startup — relaunching"
+            )
+            build_async()
+
     yield
     scheduler.stop()
 
