@@ -189,6 +189,77 @@ def _analyze_collections(plex_ids, tmdb, ignore_franchises, ignore_movies, wishl
     return franchises, franchise_completion
 
 
+def _resolve_person(tmdb, name, known_movie_ids, role, max_candidates=5):
+    """Resolve a person name to the correct TMDB person + movie credits.
+
+    TMDB's /search/person ranks by global relevance, so for localized names
+    (e.g. Simplified Chinese) or people who share a name the first result is
+    often the wrong person, which yields a completely unrelated filmography
+    (see issue #98). To disambiguate we walk the top candidates and pick the
+    one whose credits actually overlap the movies we already know this person
+    appears in (``known_movie_ids``, collected from the media server library).
+
+    ``role`` is "actor" (match against the ``cast`` list) or "director"
+    (match against ``crew`` entries with ``job == "Director"``).
+
+    Returns ``(person_id, credits)`` for the best match, or ``(None, None)``
+    when nothing can be resolved. Falls back to the first search result when
+    no candidate overlaps the known movies (preserves prior behaviour for
+    people not yet represented by a known film).
+    """
+    sr = tmdb.search_person(name)
+    if not sr or not sr.get("results"):
+        return None, None
+
+    results = sr["results"][:max_candidates]
+    known   = {int(x) for x in known_movie_ids} if known_movie_ids else set()
+
+    best_pid     = None
+    best_credits = None
+    best_overlap = 0
+    fallback_pid = None
+
+    for cand in results:
+        pid = cand.get("id")
+        if not pid:
+            continue
+        if fallback_pid is None:
+            fallback_pid = pid
+
+        if not known:
+            # No ground truth to validate against — keep first result.
+            break
+
+        credits = tmdb.person_credits(pid)
+        if not credits:
+            continue
+
+        if role == "director":
+            cand_ids = {
+                int(m["id"]) for m in credits.get("crew", [])
+                if m.get("id") is not None and m.get("job") == "Director"
+            }
+        else:
+            cand_ids = {
+                int(m["id"]) for m in credits.get("cast", [])
+                if m.get("id") is not None
+            }
+
+        overlap = len(cand_ids & known)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_pid     = pid
+            best_credits = credits
+
+    if best_pid is not None:
+        return best_pid, best_credits
+
+    # No validated match — fall back to the first search result.
+    if fallback_pid is None:
+        return None, None
+    return fallback_pid, tmdb.person_credits(fallback_pid)
+
+
 def _analyze_directors(directors_map, plex_ids, tmdb, ignore_directors, ignore_movies, wishlist_movies):
     """Analyze director filmographies for missing films.
 
@@ -201,16 +272,8 @@ def _analyze_directors(directors_map, plex_ids, tmdb, ignore_directors, ignore_m
         if director in ignore_directors:
             continue
 
-        sr = tmdb.search_person(director)
-        if not sr or not sr.get("results"):
-            continue
-
-        pid = sr["results"][0].get("id")
-        if not pid:
-            continue
-
-        credits = tmdb.person_credits(pid)
-        if not credits:
+        pid, credits = _resolve_person(tmdb, director, directors_map.get(director), "director")
+        if not pid or not credits:
             continue
 
         missing = []
@@ -406,14 +469,8 @@ def _analyze_actors(actors_map, plex_ids, tmdb, ignore_actors, ignore_movies, wi
         if actor in ignore_actors:
             continue
 
-        sr = tmdb.search_person(actor)
-        if not sr or not sr.get("results"):
-            continue
-
-        pid = sr["results"][0]["id"]
-
-        credits = tmdb.person_credits(pid)
-        if not credits:
+        pid, credits = _resolve_person(tmdb, actor, actors_map.get(actor), "actor")
+        if not pid or not credits:
             continue
 
         films = [
