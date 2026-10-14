@@ -83,6 +83,40 @@ class TestLibraryId:
 
 
 # ─────────────────────────────────────────────
+# Auth headers — Jellyfin 12 compatibility (issue #108)
+# ─────────────────────────────────────────────
+
+class TestAuthHeaders:
+
+    def test_includes_modern_authorization_header(self):
+        """Jellyfin 12 dropped X-Emby-Token; the Authorization header is required."""
+        import app.jellyfin_api as jf
+        headers = jf._auth_headers("mykey")
+        assert headers["Authorization"] == 'MediaBrowser Token="mykey"'
+
+    def test_keeps_legacy_header_for_older_servers(self):
+        import app.jellyfin_api as jf
+        headers = jf._auth_headers("mykey")
+        assert headers["X-Emby-Token"] == "mykey"
+
+    def test_jf_get_sends_authorization_header(self, monkeypatch):
+        """The actual request must carry the modern header, not just the helper."""
+        import app.jellyfin_api as jf
+        monkeypatch.setattr("app.jellyfin_api.load_config", lambda: BASE_CONFIG)
+
+        captured = {}
+
+        def mock_get(url, *a, **k):
+            captured["headers"] = k.get("headers", {})
+            return _media_folders_response(["Movies"])
+
+        monkeypatch.setattr("requests.get", mock_get)
+        jf._library_id("Movies")
+
+        assert captured["headers"].get("Authorization") == 'MediaBrowser Token="testtoken"'
+
+
+# ─────────────────────────────────────────────
 # scan_movies — stats & basic indexing
 # ─────────────────────────────────────────────
 

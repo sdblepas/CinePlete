@@ -30,11 +30,28 @@ def _build_lib_cfg(lib_cfg):
     }
 
 
+def _auth_headers(api_key: str) -> dict:
+    """Build auth headers accepted by every Jellyfin version.
+
+    Jellyfin 12 disabled legacy authentication by default
+    (EnableLegacyAuthorization=false), so it no longer reads the X-Emby-Token
+    header or the ?api_key= query parameter — those return 401 (issue #108).
+    The modern `Authorization: MediaBrowser Token="..."` header has been the
+    standard since Jellyfin 10.8, so sending it needs no version detection.
+    We also keep X-Emby-Token for Emby and pre-12 Jellyfin; a server simply
+    ignores whichever header it does not understand.
+    """
+    return {
+        "X-Emby-Token": api_key,
+        "Authorization": f'MediaBrowser Token="{api_key}"',
+    }
+
+
 def _jf_get(path: str, lib_cfg=None, params: dict = None, timeout: int = 120) -> dict:
     """Make an authenticated GET request to Jellyfin and return JSON."""
     lc = _build_lib_cfg(lib_cfg)
 
-    headers = {"X-Emby-Token": lc["api_key"]}
+    headers = _auth_headers(lc["api_key"])
     url     = lc["url"].rstrip("/") + path
 
     try:

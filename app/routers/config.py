@@ -19,6 +19,21 @@ from app.routers._shared import log
 router = APIRouter()
 
 
+def _emby_like_headers(token: str) -> dict:
+    """Auth headers for Jellyfin/Emby connection tests.
+
+    Jellyfin 12 disabled legacy auth by default and stopped reading the
+    X-Emby-Token header, returning 401 (issue #108). The modern
+    `Authorization: MediaBrowser Token="..."` header works on every Jellyfin
+    (>=10.8) and on Emby, so we send both and let each server pick the one it
+    understands — no server-type branching needed.
+    """
+    return {
+        "X-Emby-Token": token,
+        "Authorization": f'MediaBrowser Token="{token}"',
+    }
+
+
 # --------------------------------------------------
 # Config
 # --------------------------------------------------
@@ -96,7 +111,7 @@ def library_test(payload: dict = Body(...)):
             if urlparse(url).scheme not in ("http", "https"):
                 return {"ok": False, "error": "URL must start with http:// or https://"}
             r = _req.get(f"{url}{prefix}/Library/MediaFolders",
-                         headers={"X-Emby-Token": key}, timeout=10)
+                         headers=_emby_like_headers(key), timeout=10)
             r.raise_for_status()
             folders = [i.get("Name","") for i in r.json().get("Items",[])]
             if lib and lib not in folders:
@@ -151,7 +166,7 @@ def _test_emby_like(url: str, token: str, library: str, path_prefix: str, server
     except Exception:
         return {"ok": False, "error": "Invalid URL format"}
 
-    headers = {"X-Emby-Token": token}
+    headers = _emby_like_headers(token)
 
     try:
         r = requests.get(f"{url}{path_prefix}/System/Info", headers=headers, timeout=10)
