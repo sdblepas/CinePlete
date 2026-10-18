@@ -1,4 +1,4 @@
-fastapi==0.142.4
+fastapi==0.143.1
 uvicorn==0.54.0
 requests==2.34.2
 pyyaml==6.0.2
